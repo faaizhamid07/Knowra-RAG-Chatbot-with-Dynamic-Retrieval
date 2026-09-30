@@ -26,6 +26,7 @@ except ImportError as e:
 
 # Constants
 AVAILABLE_GROQ_MODELS = [
+    "openai/gpt-oss-120b",
     "deepseek-r1-distill-qwen-32b",
     "meta-llama/llama-4-scout-17b-16e-instruct",
     "meta-llama/llama-4-maverick-17b-128e-instruct",
@@ -33,7 +34,7 @@ AVAILABLE_GROQ_MODELS = [
     "llama-3.3-70b-versatile",
     "qwen-qwq-32b",
     "qwen-2.5-32b",
-    "deepseek-r1-distill-llama-70b",
+    "deepseek-r1-distill-llama-70b"
 ]
 
 MODE_OPTIONS = ["Dynamic (Default)", "LLM Native Only", "Vectorstore Only", "Web Search Only"]

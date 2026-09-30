@@ -40,8 +40,8 @@ venv.bak/
 docker-compose.override.yml
 
 # Data files
-# chroma_db/
-# data/
+chroma_db/
+data/
 
 # Logs
 *.log
