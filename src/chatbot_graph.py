@@ -87,12 +87,27 @@ COMPREHENSIVE_ROUTER_PROMPT = ChatPromptTemplate.from_messages([
 
 # RAG Prompts (Strict)
 VECTORSTORE_RAG_PROMPT_TEMPLATE = """Answer based *only* on the provided context documents about AI... If you don't know, say so...
-Context: {context} Question: {question} Answer:"""
+Chat History: {chat_history}
+Context: {context}
+Question: {question}
+Answer:"""
 VECTORSTORE_RAG_PROMPT = ChatPromptTemplate.from_template(VECTORSTORE_RAG_PROMPT_TEMPLATE)
 
 WEB_SEARCH_RAG_PROMPT_TEMPLATE = """Answer based *only* on the provided web search results... If results are irrelevant, say so... Cite sources if possible...
-Web Search Results: {context} Question: {question} Answer:"""
+Chat History: {chat_history}
+Web Search Results: {context}
+Question: {question}
+Answer:"""
 WEB_SEARCH_RAG_PROMPT = ChatPromptTemplate.from_template(WEB_SEARCH_RAG_PROMPT_TEMPLATE)
+
+CONDENSE_QUESTION_PROMPT_TEMPLATE = """Given the following conversation and a follow up question, rephrase the follow up question to be a standalone question, in its original language.
+If it doesn't need rephrasing, just output the original question. Do NOT answer the question, just reformulate it if needed, otherwise return it exactly as is.
+
+Chat History:
+{chat_history}
+Follow Up Input: {question}
+Standalone question:"""
+CONDENSE_QUESTION_PROMPT = ChatPromptTemplate.from_template(CONDENSE_QUESTION_PROMPT_TEMPLATE)
 
 # --- Helper Functions ---
 def format_chat_history_for_prompt(chat_history: List[Dict[str, str]]) -> str:
@@ -142,15 +157,34 @@ def route_query_node(state: ChatbotState) -> Dict[str, Any]:
         # Default to vectorstore even on error
         return {"retrieval_mode": "vectorstore", "error": f"Failed comprehensive routing, trying VS: {e}"}
 
+def get_standalone_query(state: ChatbotState) -> str:
+    """Reformulates the user query based on chat history to make it standalone."""
+    chat_history = state.get('chat_history', [])
+    query = state['query']
+    if not chat_history:
+        return query
+
+    chat_history_str = format_chat_history_for_prompt(chat_history)
+    try:
+        condense_chain = CONDENSE_QUESTION_PROMPT | llm
+        response = condense_chain.invoke({"chat_history": chat_history_str, "question": query})
+        standalone_query = response.content.strip()
+        logger.info(f"Original Query: '{query}' -> Standalone Query: '{standalone_query}'")
+        return standalone_query
+    except Exception as e:
+        logger.error(f"Error condensing query: {e}. Falling back to original query.", exc_info=True)
+        return query
+
 
 def retrieve_vectorstore_node(state: ChatbotState) -> Dict[str, Any]:
     """Retrieves documents from vectorstore."""
     logger.info("--- Retrieving from Vectorstore ---")
     query = state['query']
+    standalone_query = get_standalone_query(state)
     state['documents'] = []  # Clear previous docs
     try:
         retriever = get_vectorstore_retriever(k=7)  # Keep k=7 for better coverage
-        documents = retriever.invoke(query)
+        documents = retriever.invoke(standalone_query)
         doc_contents = [doc.page_content for doc in documents]
         logger.info(f"Retrieved {len(doc_contents)} chunks from vectorstore.")
         if doc_contents:
@@ -167,12 +201,13 @@ def retrieve_web_node(state: ChatbotState) -> Dict[str, Any]:
     """Retrieves documents from web search."""
     logger.info("--- Retrieving from Web Search ---")
     query = state['query']
+    standalone_query = get_standalone_query(state)
     current_mode = state['retrieval_mode']  # Should be 'web_search'
     state['documents'] = []  # Clear previous docs
     try:
         search_tool = get_web_search_tool(max_results=4)
         if WEB_SEARCH_PROVIDER == 'tavily':
-            results = search_tool.invoke({"query": query})
+            results = search_tool.invoke({"query": standalone_query})
             if isinstance(results, list) and results:
                 results_str = "\n\n".join([f"Source URL: {res.get('url', 'N/A')}\nContent: {res.get('content', 'N/A')}" 
                                             for res in results if res.get('content')])
