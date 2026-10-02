@@ -245,7 +245,7 @@ def delete_conversation(target_id):
 
 # --- Main App Code ---
 def main():
-    st.set_page_config(page_title="AI RAG Chatbot", page_icon="🧠", layout="centered")
+    st.set_page_config(page_title="AI RAG Chatbot", page_icon="🧠", layout="wide")
 
     st.markdown(CSS_STYLE, unsafe_allow_html=True)
 
@@ -288,43 +288,15 @@ def main():
 
     # Sidebar
     with st.sidebar:
-        # --- Conversation History Section ---
-        if st.button("➕ New Chat", use_container_width=True, key="btn_new_chat"):
-            start_new_conversation()
-            st.rerun()
+        # --- Sidebar Header Card (Figma Brand Section) ---
+        st.markdown('''
+        <div class="sidebar-header-card">
+            <div class="sidebar-header-icon">🧠</div>
+            <div class="sidebar-header-title">Multi-Source RAG</div>
+        </div>
+        ''', unsafe_allow_html=True)
 
-        st.divider()
-
-        # List saved conversations, newest first
-        sorted_convs = sorted(
-            st.session_state.conversations.items(),
-            key=lambda item: item[1].get("created_at", 0),
-            reverse=True,
-        )
-        if sorted_convs:
-            st.caption("Recent Conversations")
-            for conv_id, conv_data in sorted_convs:
-                is_active = (conv_id == st.session_state.active_conversation_id)
-                title = conv_data.get("title", "New Chat")
-                btn_col, del_col = st.columns([5, 1])
-                with btn_col:
-                    if st.button(
-                        f"{'▶ ' if is_active else ''}{title}",
-                        key=f"conv_{conv_id}",
-                        use_container_width=True,
-                        type="primary" if is_active else "secondary",
-                    ):
-                        if not is_active:
-                            switch_conversation(conv_id)
-                            st.rerun()
-                with del_col:
-                    if st.button("✕", key=f"del_{conv_id}", help="Delete conversation"):
-                        delete_conversation(conv_id)
-                        st.rerun()
-
-        st.divider()
-
-        # --- Existing Configuration Section (unchanged) ---
+        # --- Existing Configuration Section ---
         st.header("⚙️ Configuration")
 
         config_tab, data_tab = st.tabs(["Chat Settings", "Data Management"])
@@ -461,6 +433,23 @@ def main():
                     st.success(f"Saved {saved_files} files.")
                     rebuild_vectorstore_with_detailed_status()
 
+        # --- RAG Engine Status Card (Figma Pro Card Equivalent) ---
+        vectorstore_ready = os.path.exists(CHROMA_PATH)
+        status_icon = "🟢" if vectorstore_ready else "🟡"
+        status_label = "Active" if vectorstore_ready else "Standby"
+        status_desc = (
+            "Vectorstore ready — document retrieval and web search enabled."
+            if vectorstore_ready
+            else "No vectorstore found. Upload documents to enable RAG retrieval."
+        )
+        st.markdown(f'''
+        <div class="sidebar-status-card">
+            <div class="sidebar-status-badge">RAG ENGINE</div>
+            <div class="sidebar-status-title">{status_icon} {status_label}</div>
+            <div class="sidebar-status-desc">{status_desc}</div>
+        </div>
+        ''', unsafe_allow_html=True)
+
     # Initialize chatbot
     chatbot_runnable = get_chatbot_runnable(st.session_state.selected_model)
     if not chatbot_runnable:
@@ -475,107 +464,192 @@ def main():
 
     # App mode content
     if st.session_state.app_mode == "chat":
-        # Chat history display
-        chat_history_container = st.container()
-        with chat_history_container:
-            st.markdown('<div class="chat-history-container">', unsafe_allow_html=True)
+        center_col, right_col = st.columns([74, 26])
 
-            for i, message in enumerate(st.session_state.messages):
-                avatar = "👤" if message["role"] == "user" else "🤖"
-                with st.chat_message(message["role"], avatar=avatar):
-                    if (message["role"] == "assistant" and
-                        i == len(st.session_state.messages) - 1 and
-                        not message.get("already_typed", False)):
-                        typewriter(st, message["content"])
-                        st.session_state.messages[i]["already_typed"] = True
-                    else:
-                        st.markdown(message["content"])
+        with right_col:
+            # Real Streamlit container -> emits st-key-right_history_panel wrapper,
+            # so the CSS can style a genuine enclosing surface.
+            history_panel = st.container(key="right_history_panel")
+            with history_panel:
+                st.markdown(
+                    '<div class="history-panel-title">🗂️ Chat History</div>',
+                    unsafe_allow_html=True,
+                )
 
-                    caption = get_chat_message_caption(message)
-                    if caption:
-                        st.caption(caption)
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        # Assistant response generation
-        if (st.session_state.messages and
-            st.session_state.messages[-1]["role"] == "user" and
-            not st.session_state.get("assistant_processing", False)):
-
-            st.session_state.assistant_processing = True
-
-            with chat_history_container:
-                with st.chat_message("assistant", avatar="🤖"):
-                    thinking_placeholder = st.empty()
-                    thinking_placeholder.markdown("Thinking... 🤔")
-
-            user_prompt = st.session_state.messages[-1]["content"]
-            final_mode = "unknown"
-            error_occurred = False
-            response_content = ""
-            start_time = time.time()
-
-            try:
-                final_state = chatbot_runnable.invoke({
-                    "query": user_prompt,
-                    "chat_history": st.session_state.messages[:-1],
-                    "forced_mode": st.session_state.get("forced_mode")
-                })
-                response_content = final_state.get("answer", "Sorry, I couldn't generate a response.")
-                final_mode = final_state.get("retrieval_mode", "unknown")
-                if final_state.get("error"):
-                    final_mode = "error"
-                    error_occurred = True
-            except Exception as e:
-                error_occurred = True
-                final_mode = "invocation_error"
-                response_content = f"An unexpected error occurred: {e}"
-
-            processing_time = f"{(time.time() - start_time):.2f}s"
-            thinking_placeholder.empty()
-
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": response_content,
-                "mode": final_mode,
-                "time": processing_time,
-                "already_typed": False
-            })
-
-            # Auto-save conversation after each assistant reply
-            save_current_conversation()
-
-            st.session_state.assistant_processing = False
-            st.rerun()
-
-        # Chat input + action buttons form ONE coherent row inside Streamlit's
-        # st.bottom container: [ input ][ Stop ][ Clear ].
-        # The bottom container is pinned inside the main content area, so the
-        # row stays centered with the chat column, follows the sidebar being
-        # expanded/collapsed, and works in both light and dark modes.
-        # (Rendering the buttons at script level would place them inline with
-        # the chat history instead, leaving them floating mid-page.)
-        with st.bottom:
-            input_col, stop_col, clear_col = st.columns(
-                [10, 1, 1], vertical_alignment="center"
-            )
-            with input_col:
-                prompt = st.chat_input("Ask me anything...", key="chat_input")
-            with stop_col:
-                if st.button("⏹️", key="stop_gen", help="Stop generating response"):
-                    st.session_state.stop_requested = True
-                    st.session_state.assistant_processing = False
-                    st.rerun()
-            with clear_col:
-                if st.button("🗑️", key="clear_chat", help="Clear chat history"):
+                if st.button("➕ New Chat", use_container_width=True, key="btn_new_chat"):
                     start_new_conversation()
                     st.rerun()
 
-        if prompt:
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            if "assistant_processing" in st.session_state:
-                del st.session_state.assistant_processing
-            st.rerun()
+                st.markdown('<div class="history-separator"></div>', unsafe_allow_html=True)
+
+                sorted_convs = sorted(
+                    st.session_state.conversations.items(),
+                    key=lambda item: item[1].get("created_at", 0),
+                    reverse=True,
+                )
+                if sorted_convs:
+                    st.markdown(
+                        '<div class="history-date-label">Recent</div>',
+                        unsafe_allow_html=True,
+                    )
+                    for conv_id, conv_data in sorted_convs:
+                        is_active = (conv_id == st.session_state.active_conversation_id)
+                        title = conv_data.get("title", "New Chat")
+                        btn_col, del_col = st.columns([5, 1])
+                        with btn_col:
+                            if st.button(
+                                f"{'▶ ' if is_active else ''}{title}",
+                                key=f"conv_{conv_id}",
+                                use_container_width=True,
+                                type="primary" if is_active else "secondary",
+                            ):
+                                if not is_active:
+                                    switch_conversation(conv_id)
+                                    st.rerun()
+                        with del_col:
+                            if st.button("✕", key=f"del_{conv_id}", help="Delete"):
+                                delete_conversation(conv_id)
+                                st.rerun()
+                else:
+                    st.markdown(
+                        '<div class="history-empty-note">'
+                        "No conversations yet. Start one above."
+                        "</div>",
+                        unsafe_allow_html=True,
+                    )
+
+        with center_col:
+            # Empty state hero — shown only when conversation has no messages yet
+            if not st.session_state.messages:
+                st.markdown('''
+                <div class="empty-state-hero">
+                    <div class="empty-state-icon">🧠</div>
+                    <div class="empty-state-title">What can I help you with?</div>
+                    <div class="empty-state-desc">Ask a question, upload documents for RAG retrieval, or search the web for the latest information.</div>
+                </div>
+                ''', unsafe_allow_html=True)
+
+                # 4-card suggestion grid (2×2) adapted to real RAG capabilities
+                card_c1, card_c2 = st.columns(2)
+                suggestions = [
+                    ("📄", "Summarize uploaded documents", "Summarize uploaded documents"),
+                    ("🌐", "Search the web for latest info", "Search the web for latest info"),
+                    ("🔍", "Compare multi-source data", "Compare multi-source data"),
+                    ("💡", "Extract key insights & facts", "Extract key insights & facts"),
+                ]
+                for idx, (icon, label, prompt_text) in enumerate(suggestions):
+                    col = card_c1 if idx % 2 == 0 else card_c2
+                    with col:
+                        st.markdown('<div class="suggestion-card-btn">', unsafe_allow_html=True)
+                        if st.button(f"{icon} {label}", key=f"suggestion_{idx}", use_container_width=True):
+                            st.session_state.messages.append({"role": "user", "content": prompt_text})
+                            if "assistant_processing" in st.session_state:
+                                del st.session_state.assistant_processing
+                            st.rerun()
+                        st.markdown('</div>', unsafe_allow_html=True)
+
+            # Chat history display
+            chat_history_container = st.container()
+            with chat_history_container:
+                st.markdown('<div class="chat-history-container">', unsafe_allow_html=True)
+
+                for i, message in enumerate(st.session_state.messages):
+                    avatar = "👤" if message["role"] == "user" else "🤖"
+                    with st.chat_message(message["role"], avatar=avatar):
+                        if (message["role"] == "assistant" and
+                            i == len(st.session_state.messages) - 1 and
+                            not message.get("already_typed", False)):
+                            typewriter(st, message["content"])
+                            st.session_state.messages[i]["already_typed"] = True
+                        else:
+                            st.markdown(message["content"])
+
+                        caption = get_chat_message_caption(message)
+                        if caption:
+                            st.caption(caption)
+
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            # Assistant response generation
+            if (st.session_state.messages and
+                st.session_state.messages[-1]["role"] == "user" and
+                not st.session_state.get("assistant_processing", False)):
+
+                st.session_state.assistant_processing = True
+
+                with chat_history_container:
+                    with st.chat_message("assistant", avatar="🤖"):
+                        thinking_placeholder = st.empty()
+                        thinking_placeholder.markdown("Thinking... 🤔")
+
+                user_prompt = st.session_state.messages[-1]["content"]
+                final_mode = "unknown"
+                error_occurred = False
+                response_content = ""
+                start_time = time.time()
+    
+                try:
+                    final_state = chatbot_runnable.invoke({
+                        "query": user_prompt,
+                        "chat_history": st.session_state.messages[:-1],
+                        "forced_mode": st.session_state.get("forced_mode")
+                    })
+                    response_content = final_state.get("answer", "Sorry, I couldn't generate a response.")
+                    final_mode = final_state.get("retrieval_mode", "unknown")
+                    if final_state.get("error"):
+                        final_mode = "error"
+                        error_occurred = True
+                except Exception as e:
+                    error_occurred = True
+                    final_mode = "invocation_error"
+                    response_content = f"An unexpected error occurred: {e}"
+    
+                processing_time = f"{(time.time() - start_time):.2f}s"
+                thinking_placeholder.empty()
+    
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": response_content,
+                    "mode": final_mode,
+                    "time": processing_time,
+                    "already_typed": False
+                })
+    
+                # Auto-save conversation after each assistant reply
+                save_current_conversation()
+    
+                st.session_state.assistant_processing = False
+                st.rerun()
+
+            # Chat input + action buttons live in a real keyed Streamlit
+            # container. A fake HTML <div> wrapper does NOT nest Streamlit
+            # widgets (each markdown call renders as its own block), which is
+            # why the surface styling never enclosed anything before.
+            input_container = st.container(key="chat_input_container")
+            with input_container:
+                input_col, stop_col, clear_col = st.columns(
+                    [10, 1, 1], vertical_alignment="center"
+                )
+
+                with input_col:
+                    prompt = st.chat_input("Ask me anything...", key="chat_input")
+
+                with stop_col:
+                    if st.button("⏹️", key="stop_gen", help="Stop generating response"):
+                        st.session_state.stop_requested = True
+                        st.session_state.assistant_processing = False
+                        st.rerun()
+
+                with clear_col:
+                    if st.button("🗑️", key="clear_chat", help="Clear chat history"):
+                        start_new_conversation()
+                        st.rerun()
+
+            if prompt:
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                if "assistant_processing" in st.session_state:
+                    del st.session_state.assistant_processing
+                st.rerun()
 
     else:  # Evaluation Mode
         st.subheader("📊 Chatbot Evaluation")
