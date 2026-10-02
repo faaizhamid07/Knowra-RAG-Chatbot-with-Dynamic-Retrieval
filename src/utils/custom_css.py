@@ -306,5 +306,34 @@ CSS_STYLE = """
             color: #343a40 !important;
             border-color: #ced4da !important;
         }
+
+        /* =========================================================
+           4. CONVERSATION HISTORY SIDEBAR LIST
+           ========================================================= */
+        /* Compact conversation buttons in sidebar */
+        [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] .stButton>button {
+            margin-top: 0.1rem;
+            margin-bottom: 0.1rem;
+            padding: 0.35rem 0.6rem;
+            font-size: 0.85rem;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* Small delete button beside each conversation */
+        [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] [data-testid="stColumn"]:last-child .stButton>button {
+            padding: 0.35rem 0.4rem;
+            font-size: 0.75rem;
+            min-width: unset;
+            border-color: transparent;
+            background-color: transparent !important;
+            opacity: 0.5;
+        }
+        [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] [data-testid="stColumn"]:last-child .stButton>button:hover {
+            opacity: 1;
+            color: #dc3545 !important;
+            background-color: transparent !important;
+        }
     </style>
 """

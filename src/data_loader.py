@@ -1,6 +1,7 @@
 import os
 import shutil
 import logging
+import streamlit as st
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
@@ -64,6 +65,7 @@ def split_documents(documents, chunk_size=1000, chunk_overlap=200):
     logging.info(f"Split into {len(chunks)} chunks.")
     return chunks
 
+@st.cache_resource(show_spinner=False)
 def get_embedding_function():
     """Initializes and returns the embedding function."""
     logging.info(f"Initializing embedding model: {EMBEDDING_MODEL_NAME}")
@@ -121,17 +123,38 @@ def setup_vectorstore(documents, chroma_path=CHROMA_PATH, embedding_function=Non
         logging.error(f"Failed to create ChromaDB vector store: {e}", exc_info=True)
         return None
 
+@st.cache_resource(show_spinner=False)
+def get_cached_chroma():
+    """Initializes and returns the Chroma vectorstore, cached to avoid recreation per query."""
+    if not os.path.exists(CHROMA_PATH):
+        return None
+    logging.info(f"Loading ChromaDB from {CHROMA_PATH} for cache...")
+    embedding_function = get_embedding_function()
+    try:
+        vectorstore = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+        logging.info("Successfully loaded and cached ChromaDB.")
+        return vectorstore
+    except Exception as e:
+        logging.error(f"Failed to load existing ChromaDB for cache: {e}", exc_info=True)
+        return None
+
 def get_vectorstore_retriever(k=4, chroma_path=CHROMA_PATH, embedding_function=None):
     """Loads the vector store and returns a retriever."""
     if not os.path.exists(chroma_path):
         logging.error(f"ChromaDB path '{chroma_path}' does not exist. Run setup_vectorstore first.")
         raise FileNotFoundError(f"ChromaDB not found at {chroma_path}")
 
-    if embedding_function is None:
-         embedding_function = get_embedding_function()
-
     try:
-        vectorstore = Chroma(persist_directory=chroma_path, embedding_function=embedding_function)
+        # Utilize the cached VectorStore if using default path, otherwise load individually
+        if chroma_path == CHROMA_PATH:
+            vectorstore = get_cached_chroma()
+            if vectorstore is None:
+                 raise RuntimeError("Failed to get cached Chroma client.")
+        else:
+            if embedding_function is None:
+                 embedding_function = get_embedding_function()
+            vectorstore = Chroma(persist_directory=chroma_path, embedding_function=embedding_function)
+
         retriever = vectorstore.as_retriever(
             search_type="mmr",
             search_kwargs={'k': k, 'lambda_mult': 0.25})

@@ -3,6 +3,7 @@ import time
 import os
 import logging
 import gc
+import uuid
 import pandas as pd
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
@@ -89,7 +90,7 @@ def delete_vectorstore():
 
     try:
         # Clear caches and collect garbage
-        get_chatbot_runnable.clear()
+        st.cache_resource.clear()
         gc.collect()
 
         if force_delete_directory(CHROMA_PATH):
@@ -120,6 +121,9 @@ def rebuild_vectorstore_with_detailed_status():
                 try:
                     if os.path.exists(CHROMA_PATH):
                         status.write("⏳ Deleting existing vectorstore...")
+                        # Clear caches to release file locks
+                        st.cache_resource.clear()
+                        gc.collect()
                         if force_delete_directory(CHROMA_PATH):
                             if 'vectorstore_checked' in st.session_state:
                                 del st.session_state.vectorstore_checked
@@ -154,6 +158,7 @@ def rebuild_vectorstore_with_detailed_status():
 
                     if 'vectorstore_checked' in st.session_state:
                         del st.session_state.vectorstore_checked
+                    st.cache_resource.clear()
                     get_chatbot_runnable.clear()
                     gc.collect()
                     time.sleep(2)
@@ -163,6 +168,80 @@ def rebuild_vectorstore_with_detailed_status():
                     status.update(label="Rebuild Failed!", state="error")
                     st.error(f"Error during rebuild: {e}")
                     logger.error(f"Error during rebuild: {e}", exc_info=True)
+
+# --- Conversation History Helpers ---
+MAX_TITLE_LENGTH = 40
+
+def generate_conversation_title(messages):
+    """Generate a readable title from the first user message."""
+    for msg in messages:
+        if msg.get("role") == "user":
+            text = msg["content"].strip()
+            if len(text) <= MAX_TITLE_LENGTH:
+                return text
+            # Truncate at the last word boundary within the limit
+            truncated = text[:MAX_TITLE_LENGTH].rsplit(" ", 1)[0]
+            return truncated + "…"
+    return "New Chat"
+
+def init_conversation_state():
+    """Initialize conversation-history session state (idempotent)."""
+    if 'conversations' not in st.session_state:
+        st.session_state.conversations = {}  # {id: {title, messages, created_at}}
+    if 'active_conversation_id' not in st.session_state:
+        st.session_state.active_conversation_id = None
+
+def save_current_conversation():
+    """Persist the current messages list into the conversations store."""
+    conv_id = st.session_state.active_conversation_id
+    messages = st.session_state.messages
+    if conv_id is None or not messages:
+        return
+    title = generate_conversation_title(messages)
+    if conv_id in st.session_state.conversations:
+        st.session_state.conversations[conv_id]["messages"] = list(messages)
+        st.session_state.conversations[conv_id]["title"] = title
+    else:
+        st.session_state.conversations[conv_id] = {
+            "title": title,
+            "messages": list(messages),
+            "created_at": time.time(),
+        }
+
+def start_new_conversation():
+    """Save current work and start a blank conversation."""
+    save_current_conversation()
+    new_id = str(uuid.uuid4())
+    st.session_state.active_conversation_id = new_id
+    st.session_state.messages = []
+    # Clear processing flag so the new chat starts clean
+    if "assistant_processing" in st.session_state:
+        del st.session_state.assistant_processing
+
+def switch_conversation(target_id):
+    """Save current work, then load the target conversation."""
+    if target_id == st.session_state.active_conversation_id:
+        return  # Already active
+    save_current_conversation()
+    conv = st.session_state.conversations.get(target_id)
+    if conv:
+        st.session_state.active_conversation_id = target_id
+        # Load a copy so in-place mutations don't affect the store
+        st.session_state.messages = list(conv["messages"])
+        # Mark all messages as already typed so they render instantly
+        for msg in st.session_state.messages:
+            msg["already_typed"] = True
+        # Clear processing flag
+        if "assistant_processing" in st.session_state:
+            del st.session_state.assistant_processing
+
+def delete_conversation(target_id):
+    """Remove a conversation from the store."""
+    st.session_state.conversations.pop(target_id, None)
+    # If we just deleted the active conversation, start fresh
+    if st.session_state.active_conversation_id == target_id:
+        st.session_state.active_conversation_id = str(uuid.uuid4())
+        st.session_state.messages = []
 
 # --- Main App Code ---
 def main():
@@ -179,6 +258,11 @@ def main():
         st.session_state.messages = []
     if 'stop_requested' not in st.session_state:
         st.session_state.stop_requested = False
+
+    # Initialize conversation history state
+    init_conversation_state()
+    if st.session_state.active_conversation_id is None:
+        st.session_state.active_conversation_id = str(uuid.uuid4())
 
     # Title and mode toggle
     st.title("🧠 Multi-Source AI Chatbot")
@@ -204,6 +288,43 @@ def main():
 
     # Sidebar
     with st.sidebar:
+        # --- Conversation History Section ---
+        if st.button("➕ New Chat", use_container_width=True, key="btn_new_chat"):
+            start_new_conversation()
+            st.rerun()
+
+        st.divider()
+
+        # List saved conversations, newest first
+        sorted_convs = sorted(
+            st.session_state.conversations.items(),
+            key=lambda item: item[1].get("created_at", 0),
+            reverse=True,
+        )
+        if sorted_convs:
+            st.caption("Recent Conversations")
+            for conv_id, conv_data in sorted_convs:
+                is_active = (conv_id == st.session_state.active_conversation_id)
+                title = conv_data.get("title", "New Chat")
+                btn_col, del_col = st.columns([5, 1])
+                with btn_col:
+                    if st.button(
+                        f"{'▶ ' if is_active else ''}{title}",
+                        key=f"conv_{conv_id}",
+                        use_container_width=True,
+                        type="primary" if is_active else "secondary",
+                    ):
+                        if not is_active:
+                            switch_conversation(conv_id)
+                            st.rerun()
+                with del_col:
+                    if st.button("✕", key=f"del_{conv_id}", help="Delete conversation"):
+                        delete_conversation(conv_id)
+                        st.rerun()
+
+        st.divider()
+
+        # --- Existing Configuration Section (unchanged) ---
         st.header("⚙️ Configuration")
 
         config_tab, data_tab = st.tabs(["Chat Settings", "Data Management"])
@@ -421,6 +542,9 @@ def main():
                 "already_typed": False
             })
 
+            # Auto-save conversation after each assistant reply
+            save_current_conversation()
+
             st.session_state.assistant_processing = False
             st.rerun()
 
@@ -444,7 +568,7 @@ def main():
                     st.rerun()
             with clear_col:
                 if st.button("🗑️", key="clear_chat", help="Clear chat history"):
-                    st.session_state.messages = []
+                    start_new_conversation()
                     st.rerun()
 
         if prompt:
