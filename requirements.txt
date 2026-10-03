@@ -4,7 +4,9 @@ langchain-community>=0.0.30
 langgraph>=0.0.45
 chromadb>=0.4.24,<0.5.0
 langchainhub>=0.1.15
-streamlit>=1.64.0
+fastapi>=0.110.0
+uvicorn>=0.28.0
+sse-starlette>=3.0.0
 python-dotenv>=1.0.1
 pypdf>=4.0.0
 tiktoken>=0.6.0
@@ -13,7 +15,8 @@ openai>=1.0.0
 sentence-transformers>=2.6.0
 pandas>=2.0.0
 hf_xet
-# Choose ONE search tool library based on .env setting:
+httpx>=0.27.0
+# Search tool provider (default: Tavily):
 tavily-python>=0.3.3
 # google-search-results>=2.4.2
-# langchain-bing-search # For Bing (might require specific setup)
+# langchain-bing-search

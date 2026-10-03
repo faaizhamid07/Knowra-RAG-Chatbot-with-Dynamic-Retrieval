@@ -1,8 +1,13 @@
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from project root .env file
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_env_path = os.path.join(_project_root, ".env")
+if os.path.exists(_env_path):
+    load_dotenv(_env_path, override=True)
+else:
+    load_dotenv(override=True)
 
 # API Keys
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -21,7 +26,7 @@ if LANGCHAIN_API_KEY:
 
 # Model Configuration
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2")
-GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "meta-llama/llama-4-maverick-17b-128e-instruct")
+GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "openai/gpt-oss-120b")
 
 # Web Search Configuration
 WEB_SEARCH_PROVIDER = os.getenv("WEB_SEARCH_PROVIDER", "tavily").lower()
