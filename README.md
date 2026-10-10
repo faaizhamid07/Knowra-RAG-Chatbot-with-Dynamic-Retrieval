@@ -21,21 +21,22 @@ Knowra is a high-performance, open-source Retrieval-Augmented Generation (RAG) c
 6. [Retrieval Modes Deep Dive](#6-retrieval-modes-deep-dive)
 7. [Real-time Streaming & Socket-Level Cancellation](#7-real-time-streaming--socket-level-cancellation)
 8. [Document Ingestion, Chunking & Embeddings Pipeline](#8-document-ingestion-chunking--embeddings-pipeline)
-9. [Evaluation Framework & Benchmarking](#9-evaluation-framework--benchmarking)
-10. [Local Setup & Quick Start Guide](#10-local-setup--quick-start-guide)
-11. [Docker & Containerized Deployment](#11-docker--containerized-deployment)
-12. [Environment Configuration](#12-environment-configuration)
-13. [API Endpoints Reference](#13-api-endpoints-reference)
-14. [Frontend UI/UX Architecture](#14-frontend-uiux-architecture)
-15. [Conversation Persistence & Thread Lifecycle](#15-conversation-persistence--thread-lifecycle)
-16. [Vector Store Administration](#16-vector-store-administration)
-17. [Testing & Quality Assurance](#17-testing--quality-assurance)
-18. [Project Structure](#18-project-structure)
-19. [Troubleshooting & Common Pitfalls](#19-troubleshooting--common-pitfalls)
-20. [Production Deployment Strategies](#20-production-deployment-strategies)
-21. [Limitations & Explicit Non-Goals](#21-limitations--explicit-non-goals)
-22. [Security & Responsible Disclosure](#22-security--responsible-disclosure)
-23. [License & Acknowledgements](#23-license--acknowledgements)
+10. [Using Your Own Documents](#9-using-your-own-documents)
+10. [Evaluation Framework & Benchmarking](#9-evaluation-framework--benchmarking)
+11. [Local Setup & Quick Start Guide](#10-local-setup--quick-start-guide)
+12. [Docker & Containerized Deployment](#11-docker--containerized-deployment)
+13. [Environment Configuration](#12-environment-configuration)
+14. [API Endpoints Reference](#13-api-endpoints-reference)
+15. [Frontend UI/UX Architecture](#14-frontend-uiux-architecture)
+16. [Conversation Persistence & Thread Lifecycle](#15-conversation-persistence--thread-lifecycle)
+17. [Vector Store Administration](#16-vector-store-administration)
+18. [Testing & Quality Assurance](#17-testing--quality-assurance)
+19. [Project Structure](#18-project-structure)
+20. [Troubleshooting & Common Pitfalls](#19-troubleshooting--common-pitfalls)
+21. [Production Deployment Strategies](#20-production-deployment-strategies)
+22. [Limitations & Explicit Non-Goals](#21-limitations--explicit-non-goals)
+23. [Security & Responsible Disclosure](#22-security--responsible-disclosure)
+24. [License & Acknowledgements](#23-license--acknowledgements)
 
 ---
 
@@ -186,7 +187,27 @@ Knowra implements true server-side token streaming using `EventSourceResponse` o
 
 ---
 
-## 9. Evaluation Framework & Benchmarking
+## 9. Using Your Own Documents
+
+Knowra is a general-purpose RAG chatbot, not a chatbot permanently tied to the included example files. The optional PDFs in [sample_documents/](sample_documents/) are provided for demonstrations only and are **not ingested automatically**.
+
+### Add documents to the knowledge base
+
+1. Choose the PDF or TXT documents relevant to your use case. You can use files from `sample_documents/` or your own documents.
+2. Copy the selected files into the project's `data/` directory.
+3. Start Knowra and open **Data Management**.
+4. Use **Rebuild Vectorstore** to ingest the files and rebuild the local ChromaDB index.
+5. Ask questions about the content of those documents.
+
+To switch to another use case, replace the files in `data/` with the relevant documents and rebuild the vector store. Keep the example files in `sample_documents/`; the application does not read from that folder.
+
+The vectorstore mode uses local documents indexed from `data/`. LLM-native mode answers without local-document retrieval, while web-search mode uses the configured web search provider. Dynamic mode chooses a retrieval route according to the existing routing logic.
+
+For a quick demonstration, copy a few selected example PDFs from `sample_documents/` into `data/`, rebuild the vector store in the UI, and ask a question grounded in those files.
+
+---
+
+## 10. Evaluation Framework & Benchmarking
 
 Knowra includes a built-in evaluation engine to assess RAG pipeline health:
 - **Test Datasets:** Standardized queries evaluating accuracy across Native, Vectorstore, and Web retrieval paths.
@@ -343,8 +364,9 @@ Multi-Source-RAG-Chatbot/
 ├── requirements.txt            # Python dependencies
 ├── run.sh                      # Unified management script (dev, test, build)
 ├── README.md                   # Complete project documentation
-├── data/                       # Document storage directory (.pdf, .txt)
-├── chroma_db/                  # Chroma vector database storage
+├── data/                       # Runtime documents to ingest (.pdf, .txt); empty by default
+├── sample_documents/           # Optional example documents for demos; not auto-ingested
+├── chroma_db/                  # Generated Chroma vector database (not committed)
 ├── frontend/                   # React 19 + TypeScript frontend application
 │   ├── src/                    # Frontend source code (Components, Hooks, API)
 │   ├── dist/                   # Pre-compiled production frontend assets

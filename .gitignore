@@ -39,7 +39,10 @@ yarn-debug.log*
 yarn-error.log*
 
 # Runtime databases & conversation persistence
-chroma_db/
+/chroma_db/
+# User-provided runtime documents are local-only; keep the empty directory in Git
+/data/*
+!/data/.gitkeep
 frontend/chroma_db/
 data/conversations.json
 frontend/data/
