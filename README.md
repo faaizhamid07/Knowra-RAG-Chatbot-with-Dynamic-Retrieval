@@ -29,6 +29,14 @@
 - [Security](#security)
 - [License](#license)
 
+## Screenshots
+
+### Knowra chat interface
+
+Knowra's main workspace combines chat configuration and retrieval controls on the left, the chat composer and prompt suggestions in the center, and conversation history on the right.
+
+![Knowra main chat interface](docs/images/knowra-main-interface.png)
+
 ## Why Knowra?
 
 A conventional RAG workflow may retrieve documents for every question, even when retrieval is unnecessary. Knowra supports different retrieval paths so the application can answer general questions directly, consult an indexed local knowledge base, or search the web for information that may be current.
