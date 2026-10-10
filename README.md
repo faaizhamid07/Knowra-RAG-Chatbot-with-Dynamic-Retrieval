@@ -21,22 +21,22 @@ Knowra is a high-performance, open-source Retrieval-Augmented Generation (RAG) c
 6. [Retrieval Modes Deep Dive](#6-retrieval-modes-deep-dive)
 7. [Real-time Streaming & Socket-Level Cancellation](#7-real-time-streaming--socket-level-cancellation)
 8. [Document Ingestion, Chunking & Embeddings Pipeline](#8-document-ingestion-chunking--embeddings-pipeline)
-10. [Using Your Own Documents](#9-using-your-own-documents)
-10. [Evaluation Framework & Benchmarking](#9-evaluation-framework--benchmarking)
-11. [Local Setup & Quick Start Guide](#10-local-setup--quick-start-guide)
-12. [Docker & Containerized Deployment](#11-docker--containerized-deployment)
-13. [Environment Configuration](#12-environment-configuration)
-14. [API Endpoints Reference](#13-api-endpoints-reference)
-15. [Frontend UI/UX Architecture](#14-frontend-uiux-architecture)
-16. [Conversation Persistence & Thread Lifecycle](#15-conversation-persistence--thread-lifecycle)
-17. [Vector Store Administration](#16-vector-store-administration)
-18. [Testing & Quality Assurance](#17-testing--quality-assurance)
-19. [Project Structure](#18-project-structure)
-20. [Troubleshooting & Common Pitfalls](#19-troubleshooting--common-pitfalls)
-21. [Production Deployment Strategies](#20-production-deployment-strategies)
-22. [Limitations & Explicit Non-Goals](#21-limitations--explicit-non-goals)
-23. [Security & Responsible Disclosure](#22-security--responsible-disclosure)
-24. [License & Acknowledgements](#23-license--acknowledgements)
+9. [Using Your Own Documents](#9-using-your-own-documents)
+10. [Evaluation Framework & Benchmarking](#10-evaluation-framework--benchmarking)
+12. [Local Setup & Quick Start Guide](#11-local-setup--quick-start-guide)
+13. [Docker & Containerized Deployment](#12-docker--containerized-deployment)
+14. [Environment Configuration](#13-environment-configuration)
+15. [API Endpoints Reference](#14-api-endpoints-reference)
+16. [Frontend UI/UX Architecture](#15-frontend-uiux-architecture)
+17. [Conversation Persistence & Thread Lifecycle](#16-conversation-persistence--thread-lifecycle)
+18. [Vector Store Administration](#17-vector-store-administration)
+19. [Testing & Quality Assurance](#18-testing--quality-assurance)
+20. [Project Structure](#19-project-structure)
+21. [Troubleshooting & Common Pitfalls](#20-troubleshooting--common-pitfalls)
+22. [Production Deployment Strategies](#21-production-deployment-strategies)
+23. [Limitations & Explicit Non-Goals](#22-limitations--explicit-non-goals)
+24. [Security & Responsible Disclosure](#23-security--responsible-disclosure)
+25. [License & Acknowledgements](#24-license--acknowledgements)
 
 ---
 
@@ -216,7 +216,7 @@ Knowra includes a built-in evaluation engine to assess RAG pipeline health:
 
 ---
 
-## 10. Local Setup & Quick Start Guide
+## 11. Local Setup & Quick Start Guide
 
 ### Prerequisites
 - Python 3.10, 3.11, or 3.12
@@ -251,7 +251,7 @@ Open **`http://localhost:8000`** in your browser.
 
 ---
 
-## 11. Docker & Containerized Deployment
+## 12. Docker & Containerized Deployment
 
 Knowra provides complete Docker and Docker Compose definitions for production deployment.
 
@@ -270,7 +270,7 @@ The containerized service runs on port `8000` with automated health checks confi
 
 ---
 
-## 12. Environment Configuration
+## 13. Environment Configuration
 
 Create a `.env` file in the root directory based on `.env.example`:
 
@@ -286,7 +286,7 @@ Create a `.env` file in the root directory based on `.env.example`:
 
 ---
 
-## 13. API Endpoints Reference
+## 14. API Endpoints Reference
 
 ### Core & Streaming
 - `GET /api/health` — Application status and uptime check.
@@ -308,7 +308,7 @@ Create a `.env` file in the root directory based on `.env.example`:
 
 ---
 
-## 14. Frontend UI/UX Architecture
+## 15. Frontend UI/UX Architecture
 
 - **Control Bar:** Dynamic model selection, retrieval mode manual override, and real-time backend health indicator.
 - **Streaming Message Bubbles:** Markdown formatting, real-time code syntax highlighting, and dynamic route badges (`LLM Native`, `Vectorstore`, `Web Search`).
@@ -318,7 +318,7 @@ Create a `.env` file in the root directory based on `.env.example`:
 
 ---
 
-## 15. Conversation Persistence & Thread Lifecycle
+## 16. Conversation Persistence & Thread Lifecycle
 
 - Conversations are serialized to `data/conversations.json` on disk.
 - When a user sends the first prompt in a new conversation, a background asynchronous task (`schedule_title_generation`) invokes a compact LLM prompt to generate a 3-5 word thread title without blocking message streaming.
@@ -326,7 +326,7 @@ Create a `.env` file in the root directory based on `.env.example`:
 
 ---
 
-## 16. Vector Store Administration
+## 17. Vector Store Administration
 
 - **Indexing:** Supports PDF and TXT document ingestion.
 - **Rebuilding:** `POST /api/vectorstore/rebuild` clears in-memory Chroma caches, re-reads all files in `data/`, creates new chunks, and re-indexes all embeddings.
@@ -334,7 +334,7 @@ Create a `.env` file in the root directory based on `.env.example`:
 
 ---
 
-## 17. Testing & Quality Assurance
+## 18. Testing & Quality Assurance
 
 Knowra maintains a multi-tier test suite covering unit tests, ASGI integration tests, and Playwright end-to-end browser automation:
 
@@ -353,7 +353,7 @@ python tests/test_e2e_all_workflows.py
 
 ---
 
-## 18. Project Structure
+## 19. Project Structure
 
 ```
 Multi-Source-RAG-Chatbot/
@@ -392,7 +392,7 @@ Multi-Source-RAG-Chatbot/
 
 ---
 
-## 19. Troubleshooting & Common Pitfalls
+## 20. Troubleshooting & Common Pitfalls
 
 - **ChromaDB / SQLite Errors on Windows:** Ensure Python 3.10-3.12 is used. ChromaDB includes embedded SQLite compatible with standard Python distributions.
 - **Groq Rate Limits (429):** Reduce concurrency or switch to `llama-3.1-8b-instant` in the UI control bar for higher token-per-minute limits.
@@ -401,7 +401,7 @@ Multi-Source-RAG-Chatbot/
 
 ---
 
-## 20. Production Deployment Strategies
+## 21. Production Deployment Strategies
 
 ### Direct Linux / VPS Deployment
 Use Systemd to manage the Uvicorn service behind an Nginx reverse proxy with SSE buffering disabled:
@@ -421,7 +421,7 @@ Deploy using the included `Dockerfile`. Set `GROQ_API_KEY` and `TAVILY_API_KEY` 
 
 ---
 
-## 21. Limitations & Explicit Non-Goals
+## 22. Limitations & Explicit Non-Goals
 
 - **Authentication:** Knowra is designed as a single-tenant workspace. User accounts and multi-tenant authentication are non-goals for this release.
 - **Cloud Vector DBs:** Knowra utilizes embedded local ChromaDB for zero-dependency local execution; managed cloud vector stores (Pinecone/Weaviate) are not required.
@@ -429,14 +429,14 @@ Deploy using the included `Dockerfile`. Set `GROQ_API_KEY` and `TAVILY_API_KEY` 
 
 ---
 
-## 22. Security & Responsible Disclosure
+## 23. Security & Responsible Disclosure
 
 - **Zero Secret Exposure:** Backend API endpoints (`/api/status`) expose only boolean validation flags, never returning API keys to the browser.
 - **Local Embedding Processing:** HuggingFace sentence transformer models execute 100% locally on CPU; document chunks are never transmitted to third parties for embedding generation.
 
 ---
 
-## 23. License & Acknowledgements
+## 24. License & Acknowledgements
 
 This project is licensed under the [MIT License](LICENSE).
 
