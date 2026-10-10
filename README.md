@@ -289,4 +289,4 @@ The browser workflow may start a local server and interact with the UI, so run i
 
 ## License
 
-This repository includes a [`LICENSE`](LICENSE) file containing the MIT License. Review that file before reusing or redistributing the project, and preserve the required copyright and permission notice. The license file currently names Sami RAJICHI as copyright holder; verify that the attribution accurately reflects the project's provenance and any upstream components before publishing or relicensing.
+This repository includes a [`LICENSE`](LICENSE) file containing the MIT License. Review that file before reusing or redistributing the project, and preserve the required copyright and permission notice. The license file currently names Faaiz Hamid as copyright holder; verify that the attribution accurately reflects the project's provenance and any upstream components before publishing or relicensing.
