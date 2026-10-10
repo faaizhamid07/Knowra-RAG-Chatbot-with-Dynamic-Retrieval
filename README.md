@@ -1,448 +1,279 @@
-# Knowra - Multi-Source RAG Chatbot with Dynamic Retrieval
+# Knowra — Ask. Retrieve. Understand.
 
-[![Open Knowra](https://img.shields.io/badge/🚀%20Open%20Knowra-Live%20App-blue?style=for-the-badge)](https://multi-source-rag-chatbot-with-dynamic.onrender.com/)
+[![Open Knowra](https://img.shields.io/badge/🚀%20Open%20Knowra-Live%20Demo-blue?style=for-the-badge)](https://multi-source-rag-chatbot-with-dynamic.onrender.com/)
+[![React](https://img.shields.io/badge/Frontend-React%2019-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![React 19](https://img.shields.io/badge/Frontend-React%2019-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![Tailwind CSS v4](https://img.shields.io/badge/Styling-Tailwind%20CSS%20v4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-FF6F00)](https://github.com/langchain-ai/langgraph)
-[![ChromaDB](https://img.shields.io/badge/Vector%20DB-Chroma-orange)](https://www.trychroma.com/)
+[![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-orange)](https://github.com/langchain-ai/langgraph)
+[![ChromaDB](https://img.shields.io/badge/Vector%20Store-ChromaDB-purple)](https://www.trychroma.com/)
 
-Knowra is a high-performance, open-source Retrieval-Augmented Generation (RAG) conversational agent engineered for intelligent, multi-source knowledge retrieval. Featuring a modern React 19 Single Page Application (SPA) served directly by an asynchronous FastAPI backend, Knowra intelligently orchestrates between native LLM conversational logic, local ChromaDB vector semantic retrieval with Maximum Marginal Relevance (MMR), and live web search via Tavily.
+**Knowra is a multi-source Retrieval-Augmented Generation (RAG) chatbot** that routes questions to the most appropriate source: the language model, documents you provide, or live web search. It combines a React interface with an asynchronous FastAPI backend and LangGraph-based retrieval orchestration.
 
----
+> **Demo note:** The hosted demo may take a little time to wake up after inactivity. Cloud instances can have temporary storage, so do not rely on a public demo to retain uploaded documents or conversations permanently.
 
-## Table of Contents
+## Contents
 
-1. [Overview & Problem Statement](#1-overview--problem-statement)
-2. [Key Highlights & Architectural Features](#2-key-highlights--architectural-features)
-3. [Dynamic Retrieval Decision Matrix & Workflow](#3-dynamic-retrieval-decision-matrix--workflow)
-4. [Tech Stack & Library Choices](#4-tech-stack--library-choices)
-5. [System Architecture & Data Flow](#5-system-architecture--data-flow)
-6. [Retrieval Modes Deep Dive](#6-retrieval-modes-deep-dive)
-7. [Real-time Streaming & Socket-Level Cancellation](#7-real-time-streaming--socket-level-cancellation)
-8. [Document Ingestion, Chunking & Embeddings Pipeline](#8-document-ingestion-chunking--embeddings-pipeline)
-9. [Using Your Own Documents](#9-using-your-own-documents)
-10. [Evaluation Framework & Benchmarking](#10-evaluation-framework--benchmarking)
-11. [Local Setup & Quick Start Guide](#11-local-setup--quick-start-guide)
-12. [Docker & Containerized Deployment](#12-docker--containerized-deployment)
-13. [Environment Configuration](#13-environment-configuration)
-14. [API Endpoints Reference](#14-api-endpoints-reference)
-15. [Frontend UI/UX Architecture](#15-frontend-uiux-architecture)
-16. [Conversation Persistence & Thread Lifecycle](#16-conversation-persistence--thread-lifecycle)
-17. [Vector Store Administration](#17-vector-store-administration)
-18. [Testing & Quality Assurance](#18-testing--quality-assurance)
-19. [Project Structure](#19-project-structure)
-20. [Troubleshooting & Common Pitfalls](#20-troubleshooting--common-pitfalls)
-21. [Production Deployment Strategies](#21-production-deployment-strategies)
-22. [Limitations & Explicit Non-Goals](#22-limitations--explicit-non-goals)
-23. [Security & Responsible Disclosure](#23-security--responsible-disclosure)
-24. [License & Acknowledgements](#24-license--acknowledgements)
+- [Why Knowra?](#why-knowra)
+- [Features](#features)
+- [How retrieval works](#how-retrieval-works)
+- [Architecture](#architecture)
+- [Technology stack](#technology-stack)
+- [Try the live demo](#try-the-live-demo)
+- [Run locally](#run-locally)
+- [Configuration](#configuration)
+- [Use your own documents](#use-your-own-documents)
+- [Docker deployment](#docker-deployment)
+- [API overview](#api-overview)
+- [Testing](#testing)
+- [Project structure](#project-structure)
+- [Known deployment considerations](#known-deployment-considerations)
+- [Security](#security)
+- [License](#license)
 
----
+## Why Knowra?
 
-## 1. Overview & Problem Statement
+A conventional RAG workflow may retrieve documents for every question, even when retrieval is unnecessary. Knowra supports different retrieval paths so the application can answer general questions directly, consult an indexed local knowledge base, or search the web for information that may be current.
 
-Traditional RAG architectures suffer from rigid retrieval paths: every user query triggers expensive vector searches or web lookups, even for conversational pleasantries, simple reasoning, or domain-specific questions outside local knowledge boundaries.
+## Features
 
-**Knowra** solves this using an asynchronous LangGraph decision graph that dynamically evaluates query intent, semantic context, and local index availability. By determining the optimal retrieval strategy per turn, Knowra minimizes latency, reduces API costs, eliminates hallucinations, and provides verifiable citations.
+- **Dynamic retrieval:** Routes between native LLM responses, local vector retrieval, and web search.
+- **Streaming responses:** Streams generated output to the interface using Server-Sent Events (SSE).
+- **Stop generation:** Lets the user cancel an active response.
+- **Conversation management:** Start conversations, switch between saved threads, and continue previous chats.
+- **Document management:** Upload PDF/TXT files and rebuild the local vector index.
+- **Retrieval controls:** Choose a model and select dynamic or a specific retrieval mode where supported by the UI.
+- **Evaluation interface:** Run the included evaluation workflow and inspect its reported results.
+- **Responsive chat interface:** React, TypeScript, Tailwind CSS, Markdown rendering, and light/dark theme support.
 
----
+## How retrieval works
 
-## 2. Key Highlights & Architectural Features
+| Mode | What it does | Typical use |
+| --- | --- | --- |
+| **Dynamic** | Uses the application's routing logic to choose a retrieval path. | General-purpose questions |
+| **LLM Native** | Generates a response without retrieving local documents. | General questions, reasoning, and conversation |
+| **Vectorstore** | Retrieves relevant chunks from documents indexed in ChromaDB. | Questions grounded in your own PDFs or text files |
+| **Web Search** | Uses the configured Tavily search integration. | Current information or questions that need web sources |
 
-- **Dynamic Multi-Source Routing:** Autonomous routing between Native LLM reasoning, ChromaDB vector retrieval, and Tavily live search.
-- **Server-Sent Events (SSE) Streaming:** Sub-100ms time-to-first-token streaming via FastAPI and `EventSourceResponse`.
-- **Socket-Level Generation Cancellation:** Immediate cancellation of in-flight LLM requests via `asyncio.Task` and HTTP connection aborts, preventing wasted API quota.
-- **Pre-Compiled SPA Distribution:** FastAPI directly mounts and serves the pre-built React 19 SPA, enabling zero-Node.js python-only execution for users.
-- **Thread Persistence & Auto-Summarization:** Multi-conversation storage with background LLM topic title generation.
-- **Vector Index Lifecycle Management:** Real-time document ingestion, status tracking, vectorstore rebuilding, and cache invalidation.
-- **Built-In Benchmarking Suite:** Automated RAG evaluation measuring retrieval latency, faithfulness, and answer relevance.
+The response route depends on the selected mode and the application's routing logic. As with any generative AI system, answers should be checked against the cited or retrieved sources for important decisions.
 
----
-
-## 3. Dynamic Retrieval Decision Matrix & Workflow
-
-Knowra leverages LangGraph conditional edges to route user queries dynamically:
+## Architecture
 
 ```mermaid
-flowchart TD
-    Start([User Input]) --> Router{LangGraph Router Node}
-    
-    Router -->|General Knowledge / Chat| LLM[LLM Native Generation]
-    Router -->|Local Ingested Context Available| Vector[ChromaDB Vector Retrieval]
-    Router -->|Real-Time / Web Request| Web[Tavily Search API]
-    
-    Vector --> ContextAggregator[Context Aggregation & Prompt Formatting]
-    Web --> ContextAggregator
-    
-    ContextAggregator --> StreamOutput[SSE Streaming Node]
-    LLM --> StreamOutput
-    
-    StreamOutput --> Complete([Client Render & Token Citation])
+flowchart LR
+    U[User] <--> UI[React + TypeScript]
+    UI <-->|REST / SSE| API[FastAPI]
+    API --> G[LangGraph retrieval workflow]
+    G --> L[Groq LLM]
+    G --> V[ChromaDB vector store]
+    G --> W[Tavily web search]
+    D[PDF / TXT files] --> I[Document loading and chunking]
+    I --> V
+    API --> C[Conversation storage]
 ```
 
-| User Intent / Mode | Target Source | Fallback / Condition | Badge Displayed |
-| :--- | :--- | :--- | :--- |
-| Conversational / Logic | **LLM Native** | Direct generation | `LLM Native` |
-| Local Document Query | **Vectorstore** | ChromaDB with MMR (`k=4`, `lambda=0.25`) | `Vectorstore` |
-| Real-Time / Current Events | **Web Search** | Tavily Search API | `Web Search` |
-| Manual Mode Override | **Forced Route** | User-selected mode in UI Control Bar | Respective Badge |
+The React single-page application is built into `frontend/dist/` and served by FastAPI in the packaged application. The vector store and conversation files use local filesystem paths by default.
 
----
+## Technology stack
 
-## 4. Tech Stack & Library Choices
+| Layer | Technologies |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, Lucide React |
+| API | Python, FastAPI, Uvicorn, Server-Sent Events |
+| Orchestration | LangChain, LangGraph, LangChain-Groq |
+| Language model | Groq API; default model configured as `openai/gpt-oss-120b` |
+| Document retrieval | ChromaDB, Sentence Transformers, `all-MiniLM-L6-v2` |
+| Web search | Tavily |
+| Tests | Python unit/integration tests and Playwright end-to-end workflow tests |
 
-### Backend
-- **Framework:** FastAPI / Starlette (Asynchronous ASGI server)
-- **RAG & Orchestration:** LangChain, LangGraph, LangChain-Groq, LangChain-Community
-- **Vector Database:** ChromaDB (Embedded local persistent vector store)
-- **Embeddings:** HuggingFace `sentence-transformers/all-MiniLM-L6-v2` (Local CPU execution)
-- **Search Provider:** Tavily AI Search API
-- **Inference Models:** Groq (Llama-3.3-70b-Versatile, Llama-3.1-8b-Instant, Mixtral-8x7b-32768)
+## Try the live demo
 
-### Frontend
-- **Framework:** React 19 (TypeScript)
-- **Build Tool:** Vite 8
-- **Styling:** Tailwind CSS v4
-- **Icons:** Lucide React
-- **Markdown & Code:** React Markdown, Remark GFM, PrismJS
+**[Open Knowra →](https://multi-source-rag-chatbot-with-dynamic.onrender.com/)**
 
----
+For a quick exploration:
+1. Open the app and wait for the service to finish waking up if needed.
+2. Try a general question in Dynamic or LLM Native mode.
+3. Try Web Search for a question that benefits from current web sources.
+4. To test document-grounded answers, upload a PDF/TXT document in Data Management and rebuild the vector store if the deployment permits it.
 
-## 5. System Architecture & Data Flow
+The hosted service is a demonstration environment. Availability, response time, and persistence depend on the hosting platform and its current configuration.
 
-```mermaid
-graph TB
-    subgraph Client [Browser / React 19 SPA]
-        UI[Conversational UI & Controls]
-        SSEClient[SSE Event Consumer]
-        Store[Local Conversation State]
-    end
-
-    subgraph Backend [FastAPI Application]
-        RouterAPI[REST / SSE Endpoints]
-        StaticServer[Starlette StaticFiles SPA Router]
-        GenRegistry[GenerationRegistry & Task Cancellation]
-        ChatGraph[Async LangGraph Engine]
-        DocPipeline[Document Loader & Chunker]
-    end
-
-    subgraph Storage [Persistent Storage]
-        ChromaStore[(ChromaDB Local Vectorstore)]
-        DataDir[/data Document Source Directory/]
-        JSONStore[(data/conversations.json)]
-    end
-
-    subgraph External [External Services]
-        GroqAPI[Groq Inference Cloud]
-        TavilyAPI[Tavily Search Engine]
-        HFModels[HuggingFace Embeddings Hub]
-    end
-
-    UI -->|HTTP REST| RouterAPI
-    UI -->|EventSource SSE| RouterAPI
-    RouterAPI --> GenRegistry
-    RouterAPI --> ChatGraph
-    RouterAPI --> DocPipeline
-    DocPipeline --> DataDir
-    DocPipeline --> ChromaStore
-    ChatGraph --> ChromaStore
-    ChatGraph --> GroqAPI
-    ChatGraph --> TavilyAPI
-    DocPipeline --> HFModels
-    RouterAPI --> JSONStore
-    StaticServer --> UI
-```
-
----
-
-## 6. Retrieval Modes Deep Dive
-
-1. **LLM Native:**
-   Used for greetings, conversational chit-chat, code generation, and logical reasoning queries. Bypasses document retrieval entirely to save compute and deliver rapid responses.
-2. **Vectorstore Retrieval (ChromaDB):**
-   Executes Maximum Marginal Relevance (MMR) search across chunked local PDF and TXT documents. Returns top `k=4` chunks with diversity parameter `lambda_mult=0.25`, ensuring high semantic relevance while avoiding redundant chunk overlap.
-3. **Web Search (Tavily):**
-   Triggers live web searches for queries requiring real-time information, breaking news, or domain knowledge not present in the local vectorstore. Formats web search snippets into structured context blocks with source URLs.
-
----
-
-## 7. Real-time Streaming & Socket-Level Cancellation
-
-Knowra implements true server-side token streaming using `EventSourceResponse` over HTTP Server-Sent Events.
-
-### Socket-Level Abort Architecture
-- When a user clicks **Stop** or initiates a new query while generation is in progress, the frontend immediately aborts the browser `EventSource` connection and issues a `POST /api/chat/cancel` request with the associated `thread_id`.
-- The backend `GenerationRegistry` tracks active `asyncio.Task` references per thread.
-- Upon receiving a cancel signal, the server task is cancelled, immediately unwinding the upstream HTTP connection to Groq and releasing GPU/network resources. Partial tokens generated prior to cancellation are safely committed to the conversation history.
-
----
-
-## 8. Document Ingestion, Chunking & Embeddings Pipeline
-
-1. **Document Loading:** Ingests `.pdf` and `.txt` files from the [data/](data/) directory using `PyPDFLoader` and `TextLoader`.
-2. **Recursive Text Chunking:** Chunks text into 1,000-character segments with a 200-character overlap using `RecursiveCharacterTextSplitter`.
-3. **Embedding Generation:** Converts chunks into 384-dimensional dense vector embeddings using `all-MiniLM-L6-v2` via HuggingFace on CPU.
-4. **Vector Persistence & Caching:** Persists vector embeddings into [chroma_db/](chroma_db/) and caches the Chroma client in-memory with thread-safe invalidation routines (`clear_cached_chroma()`).
-
----
-
-## 9. Using Your Own Documents
-
-Knowra is a general-purpose RAG chatbot, not a chatbot permanently tied to the included example files. The optional PDFs in [sample_documents/](sample_documents/) are provided for demonstrations only and are **not ingested automatically**.
-
-### Add documents to the knowledge base
-
-1. Choose the PDF or TXT documents relevant to your use case. You can use files from `sample_documents/` or your own documents.
-2. Copy the selected files into the project's `data/` directory.
-3. Start Knowra and open **Data Management**.
-4. Use **Rebuild Vectorstore** to ingest the files and rebuild the local ChromaDB index.
-5. Ask questions about the content of those documents.
-
-To switch to another use case, replace the files in `data/` with the relevant documents and rebuild the vector store. Keep the example files in `sample_documents/`; the application does not read from that folder.
-
-The vectorstore mode uses local documents indexed from `data/`. LLM-native mode answers without local-document retrieval, while web-search mode uses the configured web search provider. Dynamic mode chooses a retrieval route according to the existing routing logic.
-
-For a quick demonstration, copy a few selected example PDFs from `sample_documents/` into `data/`, rebuild the vector store in the UI, and ask a question grounded in those files.
-
----
-
-## 10. Evaluation Framework & Benchmarking
-
-Knowra includes a built-in evaluation engine to assess RAG pipeline health:
-- **Test Datasets:** Standardized queries evaluating accuracy across Native, Vectorstore, and Web retrieval paths.
-- **Metrics Evaluated:** Retrieval Latency (ms), Time to First Token (TTFT), Answer Faithfulness, and Source Relevance.
-- **Execution:** Triggerable via the frontend Admin Modal or programmatically through `POST /api/evaluation/run`.
-
----
-
-## 11. Local Setup & Quick Start Guide
+## Run locally
 
 ### Prerequisites
-- Python 3.10, 3.11, or 3.12
-- Active [Groq API Key](https://console.groq.com/)
-- Optional: [Tavily API Key](https://tavily.com/) for live web search
 
-### Quick Start (Python Only - Zero Node.js Required)
+- Python 3.12 recommended
+- Node.js and npm only if you want to rebuild or develop the frontend
+- A [Groq API key](https://console.groq.com/)
+- A [Tavily API key](https://tavily.com/) for web search
 
-Knowra includes pre-compiled frontend assets in `frontend/dist/`. You can run the entire application using Python:
+### 1. Clone the repository
 
 ```bash
-# 1. Clone repository
 git clone https://github.com/faaizhamid07/Multi-Source-RAG-Chatbot-with-Dynamic-Retrieval-.git
-cd Multi-Source-RAG-Chatbot
+cd Multi-Source-RAG-Chatbot-with-Dynamic-Retrieval-
+```
 
-# 2. Set up virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+### 2. Create a virtual environment and install dependencies
 
-# 3. Install dependencies
+**Windows PowerShell**
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -r requirements.txt
+```
 
-# 4. Configure environment variables
-cp .env.example .env
-# Open .env and insert your GROQ_API_KEY and TAVILY_API_KEY
+**macOS / Linux**
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
 
-# 5. Launch the application
+### 3. Configure environment variables
+
+Create a `.env` file in the repository root and add your keys:
+
+```dotenv
+GROQ_API_KEY=your_groq_api_key
+TAVILY_API_KEY=your_tavily_api_key
+GROQ_MODEL_NAME=openai/gpt-oss-120b
+EMBEDDING_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
+WEB_SEARCH_PROVIDER=tavily
+```
+
+Keep real keys private. Do not commit `.env` to Git.
+
+### 4. Start the application
+
+If the repository's launcher is available in your environment:
+
+```bash
 ./run.sh
-# Or manually: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
-```
-Open **`http://localhost:8000`** in your browser.
-
----
-
-## 12. Docker & Containerized Deployment
-
-Knowra provides complete Docker and Docker Compose definitions for production deployment.
-
-```bash
-# Build and start container
-docker-compose up --build -d
-
-# View real-time container logs
-docker-compose logs -f
-
-# Stop container
-docker-compose down
 ```
 
-The containerized service runs on port `8000` with automated health checks configured against `/api/health`.
-
----
-
-## 13. Environment Configuration
-
-Create a `.env` file in the root directory based on `.env.example`:
-
-| Variable | Required | Description | Default |
-| :--- | :--- | :--- | :--- |
-| `GROQ_API_KEY` | **Yes** | Groq Cloud API authentication key | *None* |
-| `TAVILY_API_KEY` | Optional | Tavily Web Search API key | *None* |
-| `MODEL_NAME` | No | Primary LLM model identifier | `llama-3.3-70b-versatile` |
-| `TEMPERATURE` | No | Model generation temperature | `0.0` |
-| `EMBEDDING_MODEL_NAME` | No | HuggingFace sentence transformer model | `all-MiniLM-L6-v2` |
-| `DATA_PATH` | No | Local directory for raw documents | `data/` |
-| `CHROMA_PATH` | No | Local directory for persistent ChromaDB | `chroma_db/` |
-
----
-
-## 14. API Endpoints Reference
-
-### Core & Streaming
-- `GET /api/health` — Application status and uptime check.
-- `GET /api/status` — API key validation status (returns boolean flags, never raw keys).
-- `POST /api/chat` — Server-Sent Events (SSE) streaming chat endpoint.
-- `POST /api/chat/cancel` — Cancels active generation task for a specific `thread_id`.
-
-### Conversation Management
-- `GET /api/conversations` — Retrieves all stored conversation summaries.
-- `GET /api/conversations/{id}` — Retrieves full message history for a specific conversation.
-- `POST /api/conversations` — Creates a new conversation thread.
-- `DELETE /api/conversations/{id}` — Deletes a conversation thread.
-
-### Document & Vectorstore Operations
-- `GET /api/documents` — Lists ingested documents and total vector count.
-- `POST /api/documents/upload` — Uploads PDF/TXT documents to the data directory.
-- `POST /api/vectorstore/rebuild` — Re-chunks data documents and rebuilds ChromaDB index.
-- `POST /api/vectorstore/purge` — Wipes ChromaDB vector index.
-
----
-
-## 15. Frontend UI/UX Architecture
-
-- **Control Bar:** Dynamic model selection, retrieval mode manual override, and real-time backend health indicator.
-- **Streaming Message Bubbles:** Markdown formatting, real-time code syntax highlighting, and dynamic route badges (`LLM Native`, `Vectorstore`, `Web Search`).
-- **Sidebar & Thread Drawer:** Thread creation, one-click thread switching, and deletion.
-- **Admin Modal:** Tabbed interface for document upload, index rebuilding, and evaluation runs.
-- **Dark/Light Theme:** Persistent color scheme toggling with Tailwind CSS v4 CSS variables.
-
----
-
-## 16. Conversation Persistence & Thread Lifecycle
-
-- Conversations are serialized to `data/conversations.json` on disk.
-- When a user sends the first prompt in a new conversation, a background asynchronous task (`schedule_title_generation`) invokes a compact LLM prompt to generate a 3-5 word thread title without blocking message streaming.
-- Thread switching preserves all past messages, retrieval badges, and timestamps.
-
----
-
-## 17. Vector Store Administration
-
-- **Indexing:** Supports PDF and TXT document ingestion.
-- **Rebuilding:** `POST /api/vectorstore/rebuild` clears in-memory Chroma caches, re-reads all files in `data/`, creates new chunks, and re-indexes all embeddings.
-- **Cache Eviction:** Thread-safe `clear_cached_chroma()` invalidates the cached vectorstore client across active worker threads.
-
----
-
-## 18. Testing & Quality Assurance
-
-Knowra maintains a multi-tier test suite covering unit tests, ASGI integration tests, and Playwright end-to-end browser automation:
+Or start the API directly:
 
 ```bash
-# Run backend unit and integration tests
+python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+```
+
+Then open [http://localhost:8000](http://localhost:8000).
+
+### Frontend development
+
+To work on the React interface separately:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Use the Vite development URL shown in the terminal. The project config is set up for frontend development against the API; run the FastAPI backend as well.
+
+## Configuration
+
+| Variable | Required? | Purpose |
+| --- | --- | --- |
+| `GROQ_API_KEY` | Yes for model responses | Authenticates requests to Groq |
+| `TAVILY_API_KEY` | Needed for Tavily search | Authenticates web-search requests |
+| `GROQ_MODEL_NAME` | No | Groq model identifier; defaults to `openai/gpt-oss-120b` |
+| `EMBEDDING_MODEL_NAME` | No | Embedding model; defaults to `sentence-transformers/all-MiniLM-L6-v2` |
+| `WEB_SEARCH_PROVIDER` | No | Search provider selection; defaults to `tavily` |
+| `LANGCHAIN_TRACING_V2` | No | Optional LangSmith tracing setting |
+| `LANGCHAIN_API_KEY` | No | Optional LangSmith API key |
+| `LANGCHAIN_PROJECT` | No | Optional LangSmith project name |
+
+The app uses `./data` for runtime documents and conversation persistence, and `./chroma_db` for the local vector database.
+
+## Use your own documents
+
+1. Open **Data Management** in Knowra.
+2. Upload a PDF or TXT file, or place files in the local `data/` directory.
+3. Rebuild the vector store so the documents are chunked and indexed.
+4. Select Vectorstore mode or use Dynamic mode and ask a question about the document.
+
+The optional examples in [sample_documents/](sample_documents/) are for demonstration only and are not automatically indexed. Uploaded documents must be indexed before vector retrieval can use them.
+
+## Docker deployment
+
+Build and run the image:
+
+```bash
+docker build -t knowra .
+docker run --rm -p 8000:8000 \
+  -e GROQ_API_KEY=your_groq_api_key \
+  -e TAVILY_API_KEY=your_tavily_api_key \
+  knowra
+```
+
+Open [http://localhost:8000](http://localhost:8000). For cloud hosting, configure API keys as the host's environment variables/secrets rather than placing them in the repository. Confirm the host's required listening port and persistent-storage settings before deploying.
+
+## API overview
+
+The FastAPI backend exposes endpoints for health/status checks, chat streaming and cancellation, conversation management, document management, vector-store operations, and evaluation. Interactive API documentation may be available at `/docs` when enabled by the running application.
+
+Common routes include:
+
+- `GET /api/health` — health check
+- `GET /api/status` — configuration/status flags
+- `POST /api/chat` — streaming chat response
+- `POST /api/chat/cancel` — cancel active generation
+- `GET /api/conversations` — list conversations
+- `POST /api/documents/upload` — upload a PDF/TXT document
+- `POST /api/vectorstore/rebuild` — rebuild the local vector index
+
+## Testing
+
+Run the Python test suite from the repository root:
+
+```bash
 python -m unittest discover -s tests -p "test_*.py"
-
-# Run full end-to-end Playwright browser test suite
-python tests/test_e2e_all_workflows.py
 ```
 
-### Test Suites Included:
-1. `test_phase3a_cancellation.py`: Socket-level stream cancellation, task registry teardown, and partial response preservation.
-2. `test_phase3b_e2e_integration.py`: ASGI integration testing of SSE streaming, document management, and conversation CRUD.
-3. `test_e2e_all_workflows.py`: Playwright browser automation verifying all 7 core user workflows across UI components.
+The repository also includes an end-to-end workflow script that uses Playwright. Install its required browser/test dependencies as documented by the test setup before running it.
 
----
+## Project structure
 
-## 19. Project Structure
-
-```
-Multi-Source-RAG-Chatbot/
-├── .env.example                # Environment variable configuration template
-├── .gitignore                  # Git ignore rules for secrets, DBs, and logs
-├── Dockerfile                  # Production container definition
-├── docker-compose.yml          # Container orchestration configuration
-├── requirements.txt            # Python dependencies
-├── run.sh                      # Unified management script (dev, test, build)
-├── README.md                   # Complete project documentation
-├── data/                       # Runtime documents to ingest (.pdf, .txt); empty by default
-├── sample_documents/           # Optional example documents for demos; not auto-ingested
-├── chroma_db/                  # Generated Chroma vector database (not committed)
-├── frontend/                   # React 19 + TypeScript frontend application
-│   ├── src/                    # Frontend source code (Components, Hooks, API)
-│   ├── dist/                   # Pre-compiled production frontend assets
-│   ├── package.json            # Node.js dependencies
-│   ├── vite.config.ts          # Vite build & proxy configuration
-│   └── README.md               # Frontend developer guide
-├── src/                        # Python backend application
-│   ├── api/                    # FastAPI endpoints & server entrypoint
-│   │   └── main.py             # Main API routing, SSE streaming, static mount
-│   ├── chatbot_graph.py        # LangGraph decision routing graph
-│   ├── chatbot_graph_async.py  # Asynchronous LangGraph execution engine
-│   ├── config.py               # Centralized configuration & environment loader
-│   ├── data_loader.py          # Document loader, text splitter, vector store manager
-│   ├── tools.py                # External tool definitions (Tavily search)
-│   └── utils/                  # Core backend helper utilities
-│       ├── env_utils.py        # Environment inspection and status checks
-│       └── file_utils.py       # Thread-safe file & conversation I/O
-└── tests/                      # Automated test suites
-    ├── test_phase3a_cancellation.py
-    ├── test_phase3b_e2e_integration.py
-    └── test_e2e_all_workflows.py
+```text
+.
+├── frontend/             # React + TypeScript application
+│   ├── src/              # UI components, hooks, and API client
+│   └── dist/             # Built frontend served by FastAPI
+├── src/
+│   ├── api/              # FastAPI routes and app entry point
+│   ├── utils/             # Shared file and environment helpers
+│   ├── chatbot_graph.py   # Retrieval graph
+│   ├── chatbot_graph_async.py
+│   ├── config.py          # Environment configuration
+│   ├── data_loader.py     # Document ingestion and vector store
+│   └── tools.py           # Search tools
+├── tests/                 # Automated tests
+├── data/                  # Runtime documents (local; not committed)
+├── sample_documents/      # Optional example documents
+├── chroma_db/             # Generated local vector database (not committed)
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+└── README.md
 ```
 
----
+## Known deployment considerations
 
-## 20. Troubleshooting & Common Pitfalls
+- **Cold starts:** Free demonstration services may sleep after inactivity and need time to wake up.
+- **Filesystem persistence:** Local ChromaDB data, uploaded documents, and conversation files may be lost when a host replaces an ephemeral instance. Use persistent storage or external storage if data must survive redeploys.
+- **API quotas and costs:** Requests to model and search providers may be subject to quotas, rate limits, and usage charges.
+- **Resource requirements:** The embedding model may need to download on first use and consumes memory/CPU.
+- **No implied production SLA:** This repository is a portfolio/demo project; production use requires deployment-specific security, monitoring, persistence, and load testing.
 
-- **ChromaDB / SQLite Errors on Windows:** Ensure Python 3.10-3.12 is used. ChromaDB includes embedded SQLite compatible with standard Python distributions.
-- **Groq Rate Limits (429):** Reduce concurrency or switch to `llama-3.1-8b-instant` in the UI control bar for higher token-per-minute limits.
-- **Port 8000 Already in Use:** Specify an alternate port when running uvicorn: `uvicorn src.api.main:app --port 8080`.
-- **SSE Stream Interrupted:** Check if an aggressive browser ad-blocker or proxy is buffering chunked HTTP responses.
+## Security
 
----
+- Never commit API keys, tokens, or private documents.
+- Set secrets through environment variables or the hosting provider's secret manager.
+- Do not upload sensitive or confidential documents to a public demo.
+- Review access controls and persistence settings before exposing an instance to other users.
 
-## 21. Production Deployment Strategies
+## License
 
-### Direct Linux / VPS Deployment
-Use Systemd to manage the Uvicorn service behind an Nginx reverse proxy with SSE buffering disabled:
-```nginx
-location /api/chat {
-    proxy_pass http://127.0.0.1:8000;
-    proxy_set_header Connection '';
-    proxy_http_version 1.1;
-    chunked_transfer_encoding off;
-    proxy_buffering off;
-    proxy_cache off;
-}
-```
-
-### Cloud Container Deployment (AWS ECS / GCP Cloud Run / Render)
-Deploy using the included `Dockerfile`. Set `GROQ_API_KEY` and `TAVILY_API_KEY` in your cloud platform's secret manager.
-
----
-
-## 22. Limitations & Explicit Non-Goals
-
-- **Authentication:** Knowra is designed as a single-tenant workspace. User accounts and multi-tenant authentication are non-goals for this release.
-- **Cloud Vector DBs:** Knowra utilizes embedded local ChromaDB for zero-dependency local execution; managed cloud vector stores (Pinecone/Weaviate) are not required.
-- **Distributed Multi-Node Scale:** Designed for lightweight, single-instance containerized deployment.
-
----
-
-## 23. Security & Responsible Disclosure
-
-- **Zero Secret Exposure:** Backend API endpoints (`/api/status`) expose only boolean validation flags, never returning API keys to the browser.
-- **Local Embedding Processing:** HuggingFace sentence transformer models execute 100% locally on CPU; document chunks are never transmitted to third parties for embedding generation.
-
----
-
-## 24. License & Acknowledgements
-
-This project is licensed under the [MIT License](LICENSE).
-
-### Acknowledgements
-- [LangChain & LangGraph](https://github.com/langchain-ai) for agent orchestration.
-- [FastAPI](https://fastapi.tiangolo.com/) for high-speed asynchronous API serving.
-- [Groq](https://groq.com/) for LPU-accelerated low-latency LLM inference.
-- [ChromaDB](https://www.trychroma.com/) for embedded vector search.
-- [Tavily AI](https://tavily.com/) for search engine retrieval.
+No license is specified in this repository at the time of writing. Unless a license is added, reuse and redistribution are not automatically granted. Add a license file if you intend to explicitly permit others to use or modify this project.
