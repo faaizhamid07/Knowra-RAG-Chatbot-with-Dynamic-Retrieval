@@ -11,8 +11,9 @@ behaviour is preserved exactly, but expresses the nodes as coroutines so that:
   generation nodes, unwinds ``ChatGroq._astream`` and aborts the upstream
   ``httpx`` request to Groq.
 
-The sync graph in ``chatbot_graph`` is left untouched and remains the engine
-for the Streamlit app.
+The synchronous graph in ``chatbot_graph`` remains available for non-streaming
+execution; the React + FastAPI application uses this asynchronous graph for
+streaming and cancellation.
 
 Design note on deltas: ``graph.astream_events`` is deliberately NOT used to
 harvest tokens. It funnels the run through a log-tracer tee, and cancelling
