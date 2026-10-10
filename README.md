@@ -226,13 +226,26 @@ Common routes include:
 
 ## Testing
 
-Run the Python test suite from the repository root:
+Run the cancellation/streaming and API integration tests from the repository root:
 
 ```bash
-python -m unittest discover -s tests -p "test_*.py"
+python tests/test_phase3a_cancellation.py
+python tests/test_phase3b_e2e_integration.py
 ```
 
-The repository also includes an end-to-end workflow script that uses Playwright. Install its required browser/test dependencies as documented by the test setup before running it.
+On systems with Bash, the repository launcher runs these two suites with:
+
+```bash
+./run.sh --test
+```
+
+A separate browser end-to-end workflow uses Playwright and expects the app's test environment and browser dependencies to be installed. Run it separately with:
+
+```bash
+python tests/test_e2e_all_workflows.py
+```
+
+The browser workflow may start a local server and interact with the UI, so run it in a suitable local development environment rather than as part of generic test discovery.
 
 ## Project structure
 
