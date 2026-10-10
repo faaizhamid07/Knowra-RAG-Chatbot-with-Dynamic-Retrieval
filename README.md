@@ -12,6 +12,7 @@
 
 ## Contents
 
+- [Screenshots](#screenshots)
 - [Why Knowra?](#why-knowra)
 - [Features](#features)
 - [How retrieval works](#how-retrieval-works)
