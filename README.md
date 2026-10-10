@@ -1,6 +1,6 @@
 # Knowra - Multi-Source RAG Chatbot with Dynamic Retrieval
 
-[![Open Knowra](https://img.shields.io/badge/🚀%20Open%20Knowra-Live%20App-blue?style=for-the-badge)](TODO_LIVE_URL)
+[![Open Knowra](https://img.shields.io/badge/🚀%20Open%20Knowra-Live%20App-blue?style=for-the-badge)](https://multi-source-rag-chatbot-with-dynamic.onrender.com/)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React 19](https://img.shields.io/badge/Frontend-React%2019-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Tailwind CSS v4](https://img.shields.io/badge/Styling-Tailwind%20CSS%20v4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
