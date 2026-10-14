@@ -1,6 +1,6 @@
 # Knowra — Ask. Retrieve. Understand.
 
-[![Open Knowra](https://img.shields.io/badge/🚀%20Open%20Knowra-Live%20Demo-blue?style=for-the-badge)]([https://multi-source-rag-chatbot-with-dynamic.onrender.com/](https://knowra-app.yellowbeach-6793485e.uaenorth.azurecontainerapps.io))
+[![Open Knowra](https://img.shields.io/badge/🚀%20Open%20Knowra-Live%20Demo-blue?style=for-the-badge)](https://knowra-app.yellowbeach-6793485e.uaenorth.azurecontainerapps.io])
 [![React](https://img.shields.io/badge/Frontend-React%2019-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-orange)](https://github.com/langchain-ai/langgraph)
