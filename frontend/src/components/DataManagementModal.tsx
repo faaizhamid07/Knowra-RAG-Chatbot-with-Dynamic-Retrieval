@@ -37,6 +37,12 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isRebuilding, setIsRebuilding] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    status: 'preparing' | 'uploading' | 'complete' | 'failed';
+    selected: number;
+    confirmed: number;
+    percentage: number | null;
+  } | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const loadDocs = async () => {
@@ -62,10 +68,30 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    const selectedCount = files.length;
     try {
       setIsUploading(true);
       setFeedback(null);
-      const res = await uploadDocuments(files);
+      setUploadProgress({
+        status: 'preparing',
+        selected: selectedCount,
+        confirmed: 0,
+        percentage: null,
+      });
+      const res = await uploadDocuments(files, ({ percentage }) => {
+        setUploadProgress({
+          status: 'uploading',
+          selected: selectedCount,
+          confirmed: 0,
+          percentage,
+        });
+      });
+      setUploadProgress({
+        status: 'complete',
+        selected: selectedCount,
+        confirmed: res.total_uploaded,
+        percentage: 100,
+      });
       if (res.errors.length > 0) {
         setFeedback({
           type: 'error',
@@ -80,6 +106,9 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
       await loadDocs();
       onStatusChange?.();
     } catch (e: any) {
+      setUploadProgress((current) =>
+        current ? { ...current, status: 'failed' } : null
+      );
       setFeedback({ type: 'error', message: e.message || 'Upload failed' });
     } finally {
       setIsUploading(false);
@@ -92,9 +121,12 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
       setFeedback(null);
       const res = await rebuildVectorstore();
       if (res.success) {
+        const indexing = res.indexing;
         setFeedback({
           type: 'success',
-          message: `Vectorstore rebuilt successfully! (${res.docs} docs, ${res.chunks} chunks indexed)`,
+          message: indexing
+            ? `Vectorstore updated successfully! (${indexing.newly_indexed_files} new, ${indexing.modified_files} modified, ${indexing.unchanged_files} unchanged, ${indexing.deleted_files} deleted; ${res.chunks} chunks)`
+            : `Vectorstore rebuilt successfully! (${res.docs} docs, ${res.chunks} chunks indexed)`,
         });
       } else {
         setFeedback({ type: 'error', message: res.message });
@@ -246,7 +278,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#e2e8f0] dark:border-[#2b2723]">
               <button
                 onClick={handleRebuild}
-                disabled={isRebuilding || (docStatus?.count ?? 0) === 0}
+                disabled={isUploading || isRebuilding || (docStatus?.count ?? 0) === 0}
                 className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#009bff] to-[#ff882b] text-white text-xs font-semibold shadow-md disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity cursor-pointer"
               >
                 {isRebuilding ? (
@@ -259,7 +291,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
 
               <button
                 onClick={handleDeleteVectorstore}
-                disabled={isLoading || !docStatus?.vectorstore_exists}
+                disabled={isUploading || isLoading || !docStatus?.vectorstore_exists}
                 className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 text-xs font-medium hover:bg-rose-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -301,6 +333,61 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
                 Supports PDF and TXT files. Files will be saved into ./data/
               </p>
             </label>
+            {uploadProgress && (
+              <div
+                className="p-4 rounded-2xl bg-[#f8fafc] dark:bg-[#1a1715] border border-[#e2e8f0] dark:border-[#2b2723] space-y-2.5"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-[#0f172a] dark:text-[#f8fafc]">
+                    {uploadProgress.status === 'preparing'
+                      ? 'Preparing upload'
+                      : uploadProgress.status === 'uploading'
+                        ? 'Uploading files'
+                        : uploadProgress.status === 'complete'
+                          ? 'Upload complete'
+                          : 'Upload failed'}
+                  </span>
+                  {uploadProgress.percentage !== null && (
+                    <span className="font-semibold text-[#009bff]">
+                      {uploadProgress.percentage}%
+                    </span>
+                  )}
+                </div>
+                <div
+                  className="h-2.5 w-full overflow-hidden rounded-full bg-[#e2e8f0] dark:bg-[#2b2723]"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={uploadProgress.percentage ?? undefined}
+                  aria-label="Upload progress"
+                >
+                  <div
+                    className={`h-full rounded-full bg-gradient-to-r from-[#009bff] to-[#ff882b] transition-[width] duration-150 ${
+                      uploadProgress.percentage === null ? 'w-1/3 animate-pulse' : ''
+                    }`}
+                    style={
+                      uploadProgress.percentage === null
+                        ? undefined
+                        : { width: `${uploadProgress.percentage}%` }
+                    }
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-[#64748b] dark:text-[#a1a1aa]">
+                  <span>
+                    {uploadProgress.status === 'complete'
+                      ? `${uploadProgress.confirmed} of ${uploadProgress.selected} files uploaded`
+                      : uploadProgress.status === 'failed'
+                        ? `${uploadProgress.confirmed} of ${uploadProgress.selected} files confirmed`
+                        : `Uploading ${uploadProgress.selected} file${uploadProgress.selected === 1 ? '' : 's'}`}
+                  </span>
+                  {uploadProgress.status === 'uploading' && uploadProgress.percentage === null && (
+                    <span>Progress unavailable</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Uploaded Documents List */}
@@ -312,6 +399,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
               {(docStatus?.count ?? 0) > 0 && (
                 <button
                   onClick={handleDeleteAllDocs}
+                  disabled={isUploading}
                   className="text-xs text-rose-500 hover:underline font-medium cursor-pointer"
                 >
                   Delete All Files
@@ -337,7 +425,8 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
                     </div>
                     <button
                       onClick={() => handleDeleteSingle(file.name)}
-                      className="p-1 text-[#94a3b8] hover:text-rose-500 transition-colors cursor-pointer"
+                      disabled={isUploading}
+                      className="p-1 text-[#94a3b8] hover:text-rose-500 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                       title="Delete document"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
