@@ -6,9 +6,9 @@
 [![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-orange)](https://github.com/langchain-ai/langgraph)
 [![ChromaDB](https://img.shields.io/badge/Vector%20Store-ChromaDB-purple)](https://www.trychroma.com/)
 
-**Knowra is a multi-source Retrieval-Augmented Generation (RAG) chatbot** that routes questions to the most appropriate source: the language model, documents you provide, or live web search. It combines a React interface with an asynchronous FastAPI backend and LangGraph-based retrieval orchestration.
+**Knowra is a multi-source Retrieval-Augmented Generation (RAG) chatbot** that routes questions to the most appropriate source: the language model, documents you provide, or web search. It combines a React interface with an asynchronous FastAPI backend and LangGraph-based retrieval orchestration.
 
-> **Demo note:** The hosted demo may take a little time to wake up after inactivity. Cloud instances can have temporary storage, so do not rely on a public demo to retain uploaded documents or conversations permanently.
+> **Demo note:** The hosted demo may take a little time to wake up after inactivity. Cloud instances can have temporary storage, so do not rely on the public demo to retain uploaded documents, vector indexes, or conversations permanently.
 
 ## Contents
 
@@ -23,6 +23,7 @@
 - [Configuration](#configuration)
 - [Use your own documents](#use-your-own-documents)
 - [Docker deployment](#docker-deployment)
+- [Automated Azure deployment](#automated-azure-deployment)
 - [API overview](#api-overview)
 - [Testing](#testing)
 - [Project structure](#project-structure)
@@ -40,7 +41,7 @@ Knowra's main workspace combines chat configuration and retrieval controls on th
 
 ## Why Knowra?
 
-A conventional RAG workflow may retrieve documents for every question, even when retrieval is unnecessary. Knowra supports different retrieval paths so the application can answer general questions directly, consult an indexed local knowledge base, or search the web for information that may be current.
+A conventional RAG workflow may retrieve documents for every question, even when retrieval is unnecessary. Knowra supports different retrieval paths so the application can answer general questions directly, consult an indexed knowledge base, or search the web for information that may be current.
 
 ## Features
 
@@ -48,7 +49,10 @@ A conventional RAG workflow may retrieve documents for every question, even when
 - **Streaming responses:** Streams generated output to the interface using Server-Sent Events (SSE).
 - **Stop generation:** Lets the user cancel an active response.
 - **Conversation management:** Start conversations, switch between saved threads, and continue previous chats.
-- **Document management:** Upload PDF/TXT files and rebuild the local vector index.
+- **Document upload progress:** Shows upload progress in the document management interface.
+- **Incremental vector indexing:** Processes new or modified documents instead of unnecessarily re-embedding every unchanged file.
+- **File change detection:** Detects new, modified, unchanged, and deleted source files during indexing.
+- **Indexing feedback and error handling:** Reports indexing/rebuild outcomes and improves handling of failures.
 - **Retrieval controls:** Choose a model and select dynamic or a specific retrieval mode where supported by the UI.
 - **Evaluation interface:** Run the included evaluation workflow and inspect its reported results.
 - **Responsive chat interface:** React, TypeScript, Tailwind CSS, Markdown rendering, and light/dark theme support.
@@ -62,7 +66,7 @@ A conventional RAG workflow may retrieve documents for every question, even when
 | **Vectorstore** | Retrieves relevant chunks from documents indexed in ChromaDB. | Questions grounded in your own PDFs or text files |
 | **Web Search** | Uses the configured Tavily search integration. | Current information or questions that need web sources |
 
-The response route depends on the selected mode and the application's routing logic. As with any generative AI system, answers should be checked against the cited or retrieved sources for important decisions.
+The response route depends on the selected mode and the application's routing logic. As with any generative AI system, answers should be checked against cited or retrieved sources for important decisions.
 
 ## Architecture
 
@@ -74,12 +78,12 @@ flowchart LR
     G --> L[Groq LLM]
     G --> V[ChromaDB vector store]
     G --> W[Tavily web search]
-    D[PDF / TXT files] --> I[Document loading and chunking]
+    D[PDF / TXT files] --> I[Document loading and incremental indexing]
     I --> V
     API --> C[Conversation storage]
 ```
 
-The React single-page application is built into `frontend/dist/` and served by FastAPI in the packaged application. The vector store and conversation files use local filesystem paths by default.
+The React single-page application is built into `frontend/dist/` and served by FastAPI in the packaged application. The vector store, uploaded documents, and conversation files use local filesystem paths by default.
 
 ## Technology stack
 
@@ -91,19 +95,20 @@ The React single-page application is built into `frontend/dist/` and served by F
 | Language model | Groq API; default model configured as `openai/gpt-oss-120b` |
 | Document retrieval | ChromaDB, Sentence Transformers, `all-MiniLM-L6-v2` |
 | Web search | Tavily |
-| Tests | Python unit/integration tests and Playwright end-to-end workflow tests |
+| Tests | Python tests and Playwright end-to-end workflow tests |
 
 ## Try the live demo
 
-**[Open Knowra →](https://multi-source-rag-chatbot-with-dynamic.onrender.com/)**
+**[Open Knowra on Azure →](https://knowra-app.yellowbeach-6793485e.uaenorth.azurecontainerapps.io)**
 
 For a quick exploration:
-1. Open the app and wait for the service to finish waking up if needed.
+
+1. Open the app and allow the service to start if it has scaled down.
 2. Try a general question in Dynamic or LLM Native mode.
 3. Try Web Search for a question that benefits from current web sources.
-4. To test document-grounded answers, upload a PDF/TXT document in Data Management and rebuild the vector store if the deployment permits it.
+4. To test document-grounded answers, upload a PDF/TXT document in Data Management, wait for the upload to finish, and run indexing before asking a question about it.
 
-The hosted service is a demonstration environment. Availability, response time, and persistence depend on the hosting platform and its current configuration.
+The hosted service is a demonstration environment. Availability, response time, provider quotas, and data persistence depend on the current cloud configuration.
 
 ## Run locally
 
@@ -117,13 +122,14 @@ The hosted service is a demonstration environment. Availability, response time, 
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/faaizhamid07/Multi-Source-RAG-Chatbot-with-Dynamic-Retrieval-.git
-cd Multi-Source-RAG-Chatbot-with-Dynamic-Retrieval-
+git clone https://github.com/faaizhamid07/Knowra-RAG-Chatbot-with-Dynamic-Retrieval.git
+cd Knowra-RAG-Chatbot-with-Dynamic-Retrieval
 ```
 
 ### 2. Create a virtual environment and install dependencies
 
 **Windows PowerShell**
+
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -132,6 +138,7 @@ pip install -r requirements.txt
 ```
 
 **macOS / Linux**
+
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
@@ -179,7 +186,7 @@ npm install
 npm run dev
 ```
 
-Use the Vite development URL shown in the terminal. The project config is set up for frontend development against the API; run the FastAPI backend as well.
+Use the Vite development URL shown in the terminal. Run the FastAPI backend as well; the Vite development server is for frontend development.
 
 ## Configuration
 
@@ -194,20 +201,21 @@ Use the Vite development URL shown in the terminal. The project config is set up
 | `LANGCHAIN_API_KEY` | No | Optional LangSmith API key |
 | `LANGCHAIN_PROJECT` | No | Optional LangSmith project name |
 
-The app uses `./data` for runtime documents and conversation persistence, and `./chroma_db` for the local vector database.
+The app uses `./data` for runtime documents and `./chroma_db` for the local vector database by default.
 
 ## Use your own documents
 
 1. Open **Data Management** in Knowra.
 2. Upload a PDF or TXT file, or place files in the local `data/` directory.
-3. Rebuild the vector store so the documents are chunked and indexed.
-4. Select Vectorstore mode or use Dynamic mode and ask a question about the document.
+3. Watch the upload progress indicator while files are being uploaded.
+4. Run vector-store indexing. The indexer compares file content and can skip unchanged files while processing new or modified documents; it also handles files removed from the source directory.
+5. Select Vectorstore mode or use Dynamic mode and ask a question about the document.
 
 The optional examples in [sample_documents/](sample_documents/) are for demonstration only and are not automatically indexed. Uploaded documents must be indexed before vector retrieval can use them.
 
 ## Docker deployment
 
-Build and run the image:
+Build and run the image locally:
 
 ```bash
 docker build -t knowra .
@@ -219,6 +227,17 @@ docker run --rm -p 8000:8000 \
 
 Open [http://localhost:8000](http://localhost:8000). For cloud hosting, configure API keys as the host's environment variables/secrets rather than placing them in the repository. Confirm the host's required listening port and persistent-storage settings before deploying.
 
+## Automated Azure deployment
+
+The repository includes a GitHub Actions workflow at `.github/workflows/publish-image.yml` that publishes the Docker image to GitHub Container Registry (GHCR) and can deploy a tagged release to Azure Container Apps.
+
+- **Push to `main`:** Builds and publishes the `latest` image and a commit-specific image tag. This event does not run the Azure deployment job.
+- **Publish a GitHub release:** Builds and publishes an image tagged with the release tag, then runs the Azure deployment job.
+- **Manually deploy an existing release:** In GitHub, open **Actions → Publish and Deploy Knowra → Run workflow**, select `main`, and enter the existing release tag in `release_tag`. This rebuilds the image from that tag and attempts to deploy it.
+- **Azure authentication:** The deployment job uses GitHub Actions OIDC with the `production` environment and repository secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID`. These must be configured correctly for deployment to work.
+
+After publishing a release, check the workflow run and confirm that both `build-and-push` and `deploy-to-azure` succeed. A successful image build alone does not mean Azure has been updated. Check the Azure Container App's active revision and live app as well.
+
 ## API overview
 
 The FastAPI backend exposes endpoints for health/status checks, chat streaming and cancellation, conversation management, document management, vector-store operations, and evaluation. Interactive API documentation may be available at `/docs` when enabled by the running application.
@@ -227,11 +246,12 @@ Common routes include:
 
 - `GET /api/health` — health check
 - `GET /api/status` — configuration/status flags
+- `GET /api/models` — model catalogue
 - `POST /api/chat` — streaming chat response
-- `POST /api/chat/cancel` — cancel active generation
+- `POST /api/chat/{conversation_id}/stop` — cancel active generation
 - `GET /api/conversations` — list conversations
-- `POST /api/documents/upload` — upload a PDF/TXT document
-- `POST /api/vectorstore/rebuild` — rebuild the local vector index
+- `POST /api/documents/upload` — upload PDF/TXT documents
+- `POST /api/vectorstore/rebuild` — run vector-store indexing/rebuild
 
 ## Testing
 
@@ -254,27 +274,31 @@ A separate browser end-to-end workflow uses Playwright and expects the app's tes
 python tests/test_e2e_all_workflows.py
 ```
 
-The browser workflow may start a local server and interact with the UI, so run it in a suitable local development environment rather than as part of generic test discovery.
+The vector-store indexer has a dedicated test module at `tests/test_vectorstore_indexer.py`. Install the project's test dependencies before running tests. The browser workflow may start a local server and interact with the UI, so run it in a suitable local development environment rather than as part of generic test discovery.
 
 ## Project structure
 
 ```text
 .
-├── frontend/             # React + TypeScript application
-│   ├── src/              # UI components, hooks, and API client
-│   └── dist/             # Built frontend served by FastAPI
+├── .github/
+│   └── workflows/
+│       └── publish-image.yml # GHCR publishing and Azure deployment workflow
+├── frontend/                 # React + TypeScript application
+│   ├── src/                  # UI components, hooks, and API client
+│   └── dist/                 # Built frontend served by FastAPI
 ├── src/
-│   ├── api/              # FastAPI routes and app entry point
-│   ├── utils/             # Shared file and environment helpers
-│   ├── chatbot_graph.py   # Retrieval graph
+│   ├── api/                  # FastAPI routes and app entry point
+│   ├── utils/                # Shared file and environment helpers
+│   ├── chatbot_graph.py      # Retrieval graph
 │   ├── chatbot_graph_async.py
-│   ├── config.py          # Environment configuration
-│   ├── data_loader.py     # Document ingestion and vector store
-│   └── tools.py           # Search tools
-├── tests/                 # Automated tests
-├── data/                  # Runtime documents (local; not committed)
-├── sample_documents/      # Optional example documents
-├── chroma_db/             # Generated local vector database (not committed)
+│   ├── config.py             # Environment configuration
+│   ├── data_loader.py        # Document loading and ChromaDB helpers
+│   ├── vectorstore_indexer.py# Incremental indexing and change detection
+│   └── tools.py              # Search tools
+├── tests/                    # Automated tests, including indexer tests
+├── data/                     # Runtime documents (local; not committed)
+├── sample_documents/         # Optional example documents
+├── chroma_db/                # Generated local vector database (not committed)
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
@@ -283,8 +307,9 @@ The browser workflow may start a local server and interact with the UI, so run i
 
 ## Known deployment considerations
 
-- **Cold starts:** Free demonstration services may sleep after inactivity and need time to wake up.
+- **Cold starts and scaling:** The hosted service may take time to respond after scaling down or inactivity.
 - **Filesystem persistence:** Local ChromaDB data, uploaded documents, and conversation files may be lost when a host replaces an ephemeral instance. Use persistent storage or external storage if data must survive redeploys.
+- **Separate deployment environments:** Documents uploaded to a local development instance are not automatically available in Azure. Treat each environment's filesystem and vector store separately unless you explicitly configure shared persistent storage.
 - **API quotas and costs:** Requests to model and search providers may be subject to quotas, rate limits, and usage charges.
 - **Resource requirements:** The embedding model may need to download on first use and consumes memory/CPU.
 - **No implied production SLA:** This repository is a portfolio/demo project; production use requires deployment-specific security, monitoring, persistence, and load testing.
@@ -298,4 +323,4 @@ The browser workflow may start a local server and interact with the UI, so run i
 
 ## License
 
-This repository includes a [`LICENSE`](LICENSE) file containing the MIT License. Review that file before reusing or redistributing the project, and preserve the required copyright and permission notice. The license file currently names Faaiz Hamid as copyright holder; verify that the attribution accurately reflects the project's provenance and any upstream components before publishing or relicensing.
+This repository includes a [`LICENSE`](LICENSE) file containing the MIT License. Review that file before reusing or redistributing the project, and preserve the required copyright and permission notice. Verify that the copyright attribution accurately reflects the project's provenance and any upstream components before publishing or relicensing.
