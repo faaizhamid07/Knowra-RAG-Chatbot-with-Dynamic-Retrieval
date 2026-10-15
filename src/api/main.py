@@ -28,12 +28,14 @@ from sse_starlette.sse import EventSourceResponse
 
 try:  # package-relative (imported as src.api.main)
     from ..config import CHROMA_PATH, DATA_PATH, EMBEDDING_MODEL_NAME, GROQ_MODEL_NAME, WEB_SEARCH_PROVIDER
-    from ..data_loader import clear_cached_chroma, load_documents, split_documents
+    from ..data_loader import clear_cached_chroma
+    from ..vectorstore_indexer import index_documents
     from ..utils.file_utils import delete_data_files, force_delete_directory, safe_filename
     from ..utils.env_utils import create_env_template, check_env_vars
 except ImportError:  # flat import (PYTHONPATH=src)
     from config import CHROMA_PATH, DATA_PATH, EMBEDDING_MODEL_NAME, GROQ_MODEL_NAME, WEB_SEARCH_PROVIDER
-    from data_loader import clear_cached_chroma, load_documents, split_documents
+    from data_loader import clear_cached_chroma
+    from vectorstore_indexer import index_documents
     from utils.file_utils import delete_data_files, force_delete_directory, safe_filename
     from utils.env_utils import create_env_template, check_env_vars
 
@@ -392,45 +394,29 @@ async def delete_single_doc(filename: str):
 
 
 @app.post("/api/vectorstore/rebuild")
-async def rebuild_vs():
-    """Rebuild ChromaDB from documents in ./data/."""
-    if not os.path.exists(DATA_PATH) or not os.listdir(DATA_PATH):
-        raise HTTPException(status_code=400, detail="No documents found in data folder to index.")
-
+async def rebuild_vs(full: bool = False):
+    """Incrementally index documents, or perform an explicit full recovery rebuild."""
     try:
-        # 1. Clear cached engines and cached vectorstore
+        if full:
+            clear_cache()
+            clear_cached_chroma()
+        metrics = index_documents(DATA_PATH, CHROMA_PATH, full=full)
         clear_cache()
         clear_cached_chroma()
-        # 2. Delete existing vectorstore safely
-        if os.path.exists(CHROMA_PATH):
-            force_delete_directory(CHROMA_PATH)
-        # 3. Load, split and ingest
-        docs = load_documents(DATA_PATH)
-        if not docs:
-            raise HTTPException(status_code=400, detail="No readable text found in documents.")
-        chunks = split_documents(docs)
-
-        # 4. Ingest into Chroma
-        from langchain_community.embeddings import HuggingFaceEmbeddings
-        from langchain_community.vectorstores import Chroma
-
-        embeddings = HuggingFaceEmbeddings(
-            model_name=EMBEDDING_MODEL_NAME,
-            model_kwargs={"device": "cpu"},
-        )
-        Chroma.from_documents(
-            documents=chunks,
-            embedding=embeddings,
-            persist_directory=CHROMA_PATH,
-        )
         return {
             "success": True,
-            "docs": len(docs),
-            "chunks": len(chunks),
-            "message": f"Successfully indexed {len(docs)} documents into {len(chunks)} chunks.",
+            "docs": metrics["readable_documents"],
+            "chunks": metrics["chunks"],
+            "message": (
+                f"Successfully indexed {metrics['readable_files']} readable documents "
+                f"into {metrics['chunks']} chunks."
+            ),
+            "indexing": metrics,
         }
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Error rebuilding vectorstore: %s", e)
         raise HTTPException(status_code=500, detail=f"Error rebuilding vectorstore: {e}")

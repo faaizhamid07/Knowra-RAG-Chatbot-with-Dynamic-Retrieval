@@ -88,21 +88,55 @@ export async function fetchDocuments(): Promise<DocumentStatus> {
 }
 
 export async function uploadDocuments(
-  files: FileList | File[]
+  files: FileList | File[],
+  onProgress?: (progress: { loaded: number; total: number; percentage: number | null }) => void
 ): Promise<{ uploaded: string[]; errors: string[]; total_uploaded: number }> {
   const formData = new FormData();
   Array.from(files).forEach((f) => formData.append('files', f));
-  const res = await fetch(`${API_BASE}/documents/upload`, {
-    method: 'POST',
-    body: formData,
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/documents/upload`);
+
+    xhr.upload.addEventListener('progress', (event) => {
+      onProgress?.({
+        loaded: event.loaded,
+        total: event.lengthComputable ? event.total : 0,
+        percentage: event.lengthComputable ? Math.round((event.loaded / event.total) * 100) : null,
+      });
+    });
+
+    xhr.addEventListener('load', () => {
+      let data: {
+        uploaded?: string[];
+        errors?: string[];
+        total_uploaded?: number;
+        detail?: string;
+      };
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        reject(new Error('Failed to parse upload response'));
+        return;
+      }
+
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new Error(data.errors?.join(', ') || data.detail || 'Failed to upload documents'));
+        return;
+      }
+
+      const uploaded = data.uploaded || [];
+      resolve({
+        uploaded,
+        errors: data.errors || [],
+        total_uploaded: uploaded.length,
+      });
+    });
+
+    xhr.addEventListener('error', () => reject(new Error('Failed to upload documents')));
+    xhr.addEventListener('abort', () => reject(new Error('Upload was cancelled')));
+    xhr.send(formData);
   });
-  if (!res.ok) throw new Error('Failed to upload documents');
-  const data = await res.json();
-  return {
-    uploaded: data.uploaded || [],
-    errors: data.errors || [],
-    total_uploaded: (data.uploaded || []).length,
-  };
 }
 
 export async function deleteAllDocuments(): Promise<{ deleted_count: number; failed_files: string[] }> {
@@ -126,6 +160,19 @@ export async function rebuildVectorstore(): Promise<{
   chunks: number;
   docs: number;
   message: string;
+  indexing?: {
+    discovered_files: number;
+    readable_files: number;
+    newly_indexed_files: number;
+    modified_files: number;
+    unchanged_files: number;
+    deleted_files: number;
+    chunks: number;
+    full_rebuild: boolean;
+    timings: {
+      total: number;
+    };
+  };
 }> {
   const res = await fetch(`${API_BASE}/vectorstore/rebuild`, {
     method: 'POST',

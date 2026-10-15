@@ -1,4 +1,5 @@
 import functools
+import gc
 import logging
 import os
 import shutil
@@ -21,6 +22,16 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 _chroma_cache_lock = threading.Lock()
 _cached_chroma_instance: Optional[Chroma] = None
+
+
+def _ensure_numpy_compat():
+    """Allow the pinned ChromaDB release to run with NumPy 2.x."""
+    import numpy as np
+
+    if not hasattr(np, "float_"):
+        np.float_ = np.float64
+    if not hasattr(np, "NaN"):
+        np.NaN = np.nan
 
 
 def load_documents(data_path=DATA_PATH):
@@ -86,7 +97,24 @@ def clear_cached_chroma():
     """Invalidate the cached ChromaDB instance (e.g. after rebuild or delete)."""
     global _cached_chroma_instance
     with _chroma_cache_lock:
+        cached_instance = _cached_chroma_instance
         _cached_chroma_instance = None
+        if cached_instance is not None:
+            client = getattr(cached_instance, "_client", None)
+            system = getattr(client, "_system", None)
+            logging.info(
+                "Closing cached Chroma client: store_type=%s client_type=%s system_type=%s",
+                type(cached_instance).__name__,
+                type(client).__name__ if client is not None else None,
+                type(system).__name__ if system is not None else None,
+            )
+            if system is not None and hasattr(system, "stop"):
+                try:
+                    system.stop()
+                except Exception:
+                    logging.exception("Failed to stop cached ChromaDB client")
+            del cached_instance
+            gc.collect()
 
 
 def get_cached_chroma():
@@ -100,6 +128,7 @@ def get_cached_chroma():
             return None
 
         logging.info(f"Loading ChromaDB from {CHROMA_PATH} for cache...")
+        _ensure_numpy_compat()
         embedding_function = get_embedding_function()
         try:
             _cached_chroma_instance = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
@@ -119,6 +148,7 @@ def setup_vectorstore(documents, chroma_path=CHROMA_PATH, embedding_function=Non
     if embedding_function is None:
         embedding_function = get_embedding_function()
 
+    _ensure_numpy_compat()
     if os.path.exists(chroma_path):
         logging.info(f"Existing ChromaDB found at {chroma_path}.")
         try:
@@ -133,6 +163,7 @@ def setup_vectorstore(documents, chroma_path=CHROMA_PATH, embedding_function=Non
         return None
 
     try:
+        _ensure_numpy_compat()
         clear_cached_chroma()
         vectorstore = Chroma.from_documents(
             documents=chunks,
@@ -153,6 +184,7 @@ def get_vectorstore_retriever(k=4, chroma_path=CHROMA_PATH, embedding_function=N
         raise FileNotFoundError(f"ChromaDB not found at {chroma_path}")
 
     try:
+        _ensure_numpy_compat()
         if chroma_path == CHROMA_PATH:
             vectorstore = get_cached_chroma()
             if vectorstore is None:
