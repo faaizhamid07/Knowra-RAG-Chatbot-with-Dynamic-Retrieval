@@ -77,5 +77,4 @@ jobs:
           az containerapp update \
             --name knowra-app \
             --resource-group knowra-rg \
-            --image "${IMAGE}" \
-            --revision-suffix "rel-${IMAGE_TAG//./-}"
+            --image "${IMAGE}"
